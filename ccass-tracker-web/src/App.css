@@ -1,0 +1,42 @@
+/* CCASS Tracker — Global styles */
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
+
+/* Smooth transitions */
+* {
+  scroll-behavior: smooth;
+}
+
+/* Focus ring for accessibility */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Animation for pulse dot */
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 hsl(var(--bullish) / 0.4); }
+  70% { box-shadow: 0 0 0 6px hsl(var(--bullish) / 0); }
+  100% { box-shadow: 0 0 0 0 hsl(var(--bullish) / 0); }
+}
+
+.pulse-ring {
+  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

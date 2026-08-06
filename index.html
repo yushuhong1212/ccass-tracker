@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>港股经纪商持股追踪 | 主力持仓监控</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="analyze.js"></script>
+<style>
+:root {
+  --bg-primary: #0a0e14; --bg-secondary: #131820; --bg-card: #181f2a;
+  --bg-table-header: #1a2232; --bg-hover: #1e2635;
+  --border: #252d3a; --border-light: #2a3342;
+  --text-primary: #e0e4ea; --text-secondary: #a0a8b5; --text-muted: #6b7385;
+  --accent-gold: #f0b90b; --accent-green: #00d4aa; --accent-red: #ff4757;
+  --accent-blue: #3b82f6; --accent-cyan: #06b6d4; --accent-orange: #f59e0b; --accent-purple: #8b5cf6;
+  --warning-bg: rgba(255, 71, 87, 0.12); --warning-border: rgba(255, 71, 87, 0.4);
+  --success-bg: rgba(0, 212, 170, 0.1); --success-border: rgba(0, 212, 170, 0.35);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5); --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.35);
+  --radius-sm: 6px; --radius: 10px; --radius-lg: 14px;
+  --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', 'Monaco', monospace;
+  --font-sans: 'Inter', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-sans); line-height: 1.6; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+
+/* 顶部导航栏 */
+.top-bar { background: var(--bg-secondary); border-bottom: 1px solid var(--border); padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.top-bar .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.15rem; letter-spacing: 0.3px; color: var(--text-primary); }
+.top-bar .logo .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent-green); box-shadow: 0 0 10px var(--accent-green); animation: pulse-dot 2s infinite; }
+@keyframes pulse-dot { 0%, 100% { box-shadow: 0 0 6px var(--accent-green); } 50% { box-shadow: 0 0 18px var(--accent-green), 0 0 30px rgba(0, 212, 170, 0.5); } }
+.top-bar .time-info { font-size: 0.82rem; color: var(--text-muted); font-family: var(--font-mono); }
+.top-bar .live-indicator { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--accent-green); font-weight: 600; }
+.top-bar .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-green); animation: blink-dot 1.2s infinite; }
+@keyframes blink-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+/* 主容器 */
+.main-container { max-width: 1440px; margin: 0 auto; padding: 20px 24px 40px; display: grid; grid-template-columns: 1fr; gap: 20px; }
+
+/* 股票选择器区域 */
+.stock-selector-bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 20px; box-shadow: var(--shadow-card); }
+.stock-selector-bar label { font-weight: 600; font-size: 0.9rem; color: var(--text-secondary); white-space: nowrap; letter-spacing: 0.3px; }
+.stock-selector-bar select, .stock-selector-bar input.custom-code {
+  background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm); padding: 10px 14px; font-size: 0.95rem; font-weight: 500; cursor: pointer;
+  appearance: none; -webkit-appearance: none; min-width: 220px; transition: var(--transition); font-family: var(--font-sans);
+}
+.stock-selector-bar select {
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a0a8b5' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+}
+.stock-selector-bar select:hover, .stock-selector-bar input.custom-code:hover { border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+.stock-selector-bar select:focus, .stock-selector-bar input.custom-code:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+.stock-selector-bar .fetch-btn { background: var(--accent-blue); color: #fff; border: none; border-radius: var(--radius-sm); padding: 10px 18px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: var(--transition); font-family: var(--font-sans); }
+.stock-selector-bar .fetch-btn:hover { background: #2f6fe0; }
+.stock-selector-bar .fetch-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.stock-info-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.info-pill { background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: 20px; padding: 6px 14px; font-size: 0.8rem; color: var(--text-secondary); font-family: var(--font-mono); white-space: nowrap; }
+.info-pill .val { color: var(--text-primary); font-weight: 600; }
+
+/* 预警横幅 */
+.alert-banner { display: flex; align-items: flex-start; gap: 10px; background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: var(--radius); padding: 14px 18px; font-size: 0.9rem; color: #ff6b7a; font-weight: 500; animation: alert-glow 2.5s ease-in-out infinite; box-shadow: 0 0 20px rgba(255, 71, 87, 0.1); }
+@keyframes alert-glow { 0%, 100% { box-shadow: 0 0 20px rgba(255, 71, 87, 0.08); } 50% { box-shadow: 0 0 35px rgba(255, 71, 87, 0.22); } }
+.alert-banner .alert-icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 1px; }
+.alert-banner .alert-content { flex: 1; line-height: 1.5; }
+.alert-banner .alert-content strong { color: #ff5c6c; }
+.alert-banner.hidden { display: none; }
+.alert-tag { display: inline-block; background: #ff4757; color: #fff; font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 4px; letter-spacing: 0.5px; animation: tag-pulse 1.8s ease-in-out infinite; }
+@keyframes tag-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+/* 内容网格 */
+.content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 1100px) { .content-grid { grid-template-columns: 1fr; } .stock-selector-bar { flex-direction: column; align-items: stretch; } .stock-info-pills { margin-left: 0; } .top-bar .time-info { display: none; } }
+@media (max-width: 600px) { .main-container { padding: 12px 8px 24px; } .stock-selector-bar { padding: 12px; } .stock-selector-bar select, .stock-selector-bar input.custom-code { min-width: 100%; width: 100%; } .top-bar { padding: 0 12px; height: 48px; } .top-bar .logo { font-size: 0.95rem; } }
+
+/* 卡片 */
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px 22px; box-shadow: var(--shadow-card); transition: var(--transition); }
+.card:hover { border-color: var(--border-light); }
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+.card-title { font-weight: 700; font-size: 1rem; color: var(--text-primary); letter-spacing: 0.3px; display: flex; align-items: center; gap: 8px; }
+.card-title .icon { font-size: 1.2rem; }
+.card-badge { font-size: 0.7rem; font-weight: 600; padding: 4px 10px; border-radius: 12px; background: var(--bg-secondary); color: var(--text-muted); border: 1px solid var(--border-light); letter-spacing: 0.4px; }
+.card-badge.warn { background: rgba(255, 71, 87, 0.15); color: #ff6b7a; border-color: rgba(255, 71, 87, 0.35); }
+
+/* 表格 */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius-sm); }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 520px; }
+table thead th { background: var(--bg-table-header); color: var(--text-muted); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.5px; text-transform: uppercase; padding: 11px 14px; text-align: left; border-bottom: 2px solid var(--border); white-space: nowrap; position: sticky; top: 0; }
+table tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-primary); white-space: nowrap; font-family: var(--font-mono); font-size: 0.83rem; }
+table tbody tr { transition: var(--transition); }
+table tbody tr:hover { background: var(--bg-hover); }
+table tbody tr.highlight-row { background: rgba(240, 185, 11, 0.05); border-left: 3px solid var(--accent-gold); }
+table tbody tr.dropped-row { background: rgba(255, 71, 87, 0.06); opacity: 0.8; }
+.rank-badge { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-weight: 700; font-size: 0.8rem; background: var(--bg-secondary); color: var(--text-secondary); }
+.rank-badge.top3 { background: rgba(240, 185, 11, 0.2); color: var(--accent-gold); box-shadow: 0 0 8px rgba(240, 185, 11, 0.25); }
+.change-up { color: var(--accent-green); font-weight: 600; }
+.change-down { color: var(--accent-red); font-weight: 600; }
+.change-neutral { color: var(--text-muted); }
+.inst-tag { display: inline-block; font-size: 0.68rem; padding: 3px 7px; border-radius: 3px; font-weight: 600; letter-spacing: 0.3px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; margin-left: 4px; }
+.inst-tag.tracked { background: rgba(240, 185, 11, 0.18); color: #f0c940; }
+
+/* 图表容器 */
+.chart-container { position: relative; width: 100%; height: 420px; }
+@media (max-width: 600px) { .chart-container { height: 300px; } }
+.chart-container canvas { width: 100% !important; height: 100% !important; }
+
+/* 图例辅助 */
+.custom-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; font-size: 0.75rem; }
+.legend-item { display: flex; align-items: center; gap: 5px; cursor: pointer; padding: 4px 10px; border-radius: 14px; transition: var(--transition); border: 1px solid transparent; font-family: var(--font-sans); font-weight: 500; color: var(--text-secondary); user-select: none; }
+.legend-item:hover { background: var(--bg-hover); border-color: var(--border-light); }
+.legend-item.dimmed { opacity: 0.4; text-decoration: line-through; text-decoration-thickness: 1px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.legend-dot.dashed-indicator { border-radius: 2px; width: 14px; height: 2px; border-top: 2px dashed; }
+
+/* 跌出前十的额外表格 */
+.dropped-section { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border-light); }
+.dropped-section .section-subtitle { font-size: 0.8rem; font-weight: 700; color: var(--accent-red); letter-spacing: 0.5px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.dropped-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: rgba(255, 71, 87, 0.05); border-radius: var(--radius-sm); margin-bottom: 6px; font-size: 0.82rem; border: 1px solid rgba(255, 71, 87, 0.2); font-family: var(--font-mono); }
+.dropped-item .broker-name { font-weight: 600; color: #ff8a95; flex: 1; }
+.dropped-item .current-rank { color: var(--text-muted); font-size: 0.75rem; }
+.ship-out-tag { background: #ff4757; color: #fff; font-size: 0.65rem; font-weight: 700; padding: 3px 8px; border-radius: 3px; letter-spacing: 0.5px; animation: tag-pulse 2s ease-in-out infinite; white-space: nowrap; }
+
+/* 滚动条 */
+::-webkit-scrollbar { height: 5px; width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #3a4455; }
+
+/* 全幅卡片 */
+.full-width-card { grid-column: 1 / -1; }
+
+/* 加载与错误态 */
+.state-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 40px 24px; text-align: center; color: var(--text-secondary); box-shadow: var(--shadow-card); }
+.state-box .big { font-size: 2rem; margin-bottom: 12px; }
+.state-box .title { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+.state-box .desc { font-size: 0.85rem; color: var(--text-muted); line-height: 1.7; max-width: 620px; margin: 0 auto; }
+.state-box code, .hint code { background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: 4px; padding: 2px 6px; font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-green); }
+.state-box.error { border-color: var(--warning-border); }
+
+/* 说明面板 */
+.hint { display: flex; gap: 10px; align-items: flex-start; background: var(--bg-card); border: 1px solid var(--border); border-left: 3px solid var(--accent-cyan); border-radius: var(--radius); padding: 12px 16px; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.7; }
+.hint .h-icon { font-size: 1.1rem; flex-shrink: 0; }
+.hint a { color: var(--accent-cyan); text-decoration: none; }
+.hint a:hover { text-decoration: underline; }
+.hint .fake-data { color: var(--accent-orange); font-weight: 600; }
+.hidden { display: none !important; }
+
+/* ============ 图表经纪商多选器 ============ */
+.chart-picker { margin-top: 14px; border-top: 1px dashed var(--border-light); padding-top: 12px; }
+.chart-picker .picker-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.chart-picker .picker-head label { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); }
+.chart-picker .picker-actions { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+.chart-picker .mini-btn { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border-light); border-radius: 5px; padding: 4px 10px; font-size: 0.74rem; cursor: pointer; font-family: var(--font-sans); transition: var(--transition); }
+.chart-picker .mini-btn:hover { border-color: var(--accent-blue); color: var(--text-primary); }
+.chart-picker .mini-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+.chart-picker .picker-search { background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: 6px; padding: 6px 12px; font-size: 0.82rem; width: 200px; max-width: 100%; font-family: var(--font-sans); }
+.chart-picker .picker-search:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 2px rgba(59,130,246,0.18); }
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; max-height: 150px; overflow-y: auto; padding: 4px 0; }
+.chip { display: inline-flex; align-items: center; gap: 5px; background: var(--bg-secondary); border: 1px solid var(--border-light); color: var(--text-secondary); border-radius: 14px; padding: 4px 10px; font-size: 0.76rem; cursor: pointer; transition: var(--transition); user-select: none; font-family: var(--font-sans); }
+.chip:hover { border-color: var(--border-light); background: var(--bg-hover); }
+.chip .swatch { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.2); }
+.chip.selected { color: var(--text-primary); border-color: var(--accent-blue); background: rgba(59,130,246,0.12); }
+.chip.selected .swatch { box-shadow: 0 0 6px currentColor; }
+.chip.tracked-tag { background: rgba(240,185,11,0.12); border-color: rgba(240,185,11,0.3); color: #f0c940; }
+
+/* ============ 排行榜卡片（增持榜 / 全部排行） ============ */
+.rank-row { display: grid; grid-template-columns: 32px 1fr auto auto; gap: 10px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 0.82rem; transition: var(--transition); }
+.rank-row:hover { background: var(--bg-hover); }
+.rank-row .rk { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: var(--bg-secondary); color: var(--text-muted); font-weight: 700; font-size: 0.76rem; }
+.rank-row .rk.top { background: rgba(0,212,170,0.18); color: var(--accent-green); }
+.rank-row .name { color: var(--text-primary); font-family: var(--font-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-row .name .tid { font-size: 0.66rem; padding: 2px 6px; border-radius: 3px; background: rgba(240,185,11,0.18); color: #f0c940; margin-left: 5px; vertical-align: middle; }
+.rank-row .val { color: var(--text-primary); font-family: var(--font-mono); font-weight: 600; white-space: nowrap; }
+.rank-row .chg.up { color: var(--accent-green); font-weight: 700; }
+.rank-row .chg.down { color: var(--accent-red); font-weight: 700; }
+.rank-row .chg.flat { color: var(--text-muted); }
+.rank-row .chg { font-family: var(--font-mono); font-size: 0.8rem; min-width: 62px; text-align: right; }
+.bar-track { height: 5px; background: var(--bg-secondary); border-radius: 3px; margin-top: 3px; overflow: hidden; }
+.bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan)); border-radius: 3px; }
+.full-table-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.full-table-controls input { background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: 6px; padding: 7px 12px; font-size: 0.82rem; flex: 1; min-width: 140px; font-family: var(--font-sans); }
+.full-table-controls input:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 2px rgba(59,130,246,0.18); }
+.full-table-controls select { background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: 6px; padding: 7px 10px; font-size: 0.8rem; cursor: pointer; font-family: var(--font-sans); }
+.pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 12px; font-size: 0.78rem; color: var(--text-muted); flex-wrap: wrap; }
+.pager button { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border-light); border-radius: 5px; padding: 5px 12px; font-size: 0.78rem; cursor: pointer; font-family: var(--font-sans); }
+.pager button:hover:not(:disabled) { border-color: var(--accent-blue); color: var(--text-primary); }
+.pager button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ============ 分析看板 ============ */
+.verdict-hero { display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: center; padding: 8px 4px 16px; }
+@media (max-width: 700px) { .verdict-hero { grid-template-columns: 1fr; gap: 16px; } }
+.verdict-score-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.verdict-score { width: 132px; height: 132px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 4px solid var(--border-light); position: relative; background: var(--bg-secondary); }
+.verdict-score .num { font-size: 2.4rem; font-weight: 800; font-family: var(--font-mono); line-height: 1; }
+.verdict-score .lbl { font-size: 0.7rem; color: var(--text-muted); letter-spacing: 1px; margin-top: 2px; }
+.verdict-score.strong-buy { border-color: var(--accent-green); box-shadow: 0 0 22px rgba(0,212,170,0.35); }
+.verdict-score.buy { border-color: #34d399; box-shadow: 0 0 18px rgba(52,211,153,0.25); }
+.verdict-score.hold { border-color: var(--accent-gold); box-shadow: 0 0 18px rgba(240,185,11,0.25); }
+.verdict-score.reduce { border-color: var(--accent-orange); box-shadow: 0 0 18px rgba(245,158,11,0.25); }
+.verdict-score.sell { border-color: var(--accent-red); box-shadow: 0 0 22px rgba(255,71,87,0.35); }
+.verdict-action { display: inline-flex; align-items: center; gap: 8px; font-size: 1.5rem; font-weight: 800; }
+.verdict-action.strong-buy { color: var(--accent-green); }
+.verdict-action.buy { color: #34d399; }
+.verdict-action.hold { color: var(--accent-gold); }
+.verdict-action.reduce { color: var(--accent-orange); }
+.verdict-action.sell { color: var(--accent-red); }
+.verdict-text { font-size: 0.92rem; color: var(--text-secondary); line-height: 1.8; }
+.verdict-text b { color: var(--text-primary); }
+.verdict-text .pos { color: var(--accent-green); font-weight: 600; }
+.verdict-text .neg { color: var(--accent-red); font-weight: 600; }
+.verdict-text .neu { color: var(--accent-gold); font-weight: 600; }
+.metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 14px; }
+.metric-cell { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.metric-cell .mk { font-size: 0.72rem; color: var(--text-muted); letter-spacing: 0.3px; }
+.metric-cell .mv { font-size: 1.05rem; font-weight: 700; font-family: var(--font-mono); margin-top: 3px; }
+.metric-cell .mv.up { color: var(--accent-green); }
+.metric-cell .mv.down { color: var(--accent-red); }
+
+/* 机构动向明细表 */
+.inst-move-row { display: grid; grid-template-columns: 28px 1fr auto auto auto; gap: 10px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+.inst-move-row:hover { background: var(--bg-hover); }
+.inst-move-row .im-rk { color: var(--text-muted); font-size: 0.74rem; text-align: center; }
+.inst-move-row .im-name { color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inst-move-row .im-hold { color: var(--text-primary); font-family: var(--font-mono); font-weight: 600; min-width: 64px; text-align: right; }
+.inst-move-row .im-chg { font-family: var(--font-mono); min-width: 64px; text-align: right; }
+.im-chg.up { color: var(--accent-green); font-weight: 700; }
+.im-chg.down { color: var(--accent-red); font-weight: 700; }
+.im-chg.flat { color: var(--text-muted); }
+.move-tag { font-size: 0.64rem; font-weight: 700; padding: 3px 7px; border-radius: 4px; letter-spacing: 0.4px; white-space: nowrap; }
+.move-tag.buy { background: rgba(0,212,170,0.16); color: var(--accent-green); border: 1px solid rgba(0,212,170,0.4); }
+.move-tag.add { background: rgba(52,211,153,0.14); color: #34d399; border: 1px solid rgba(52,211,153,0.35); }
+.move-tag.watch { background: rgba(160,168,181,0.12); color: var(--text-secondary); border: 1px solid var(--border-light); }
+.move-tag.reduce { background: rgba(245,158,11,0.14); color: var(--accent-orange); border: 1px solid rgba(245,158,11,0.35); }
+.move-tag.exit { background: rgba(255,71,87,0.16); color: var(--accent-red); border: 1px solid rgba(255,71,87,0.4); }
+
+/* 对比扫描器 */
+.scan-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.scan-tab { background: var(--bg-secondary); border: 1px solid var(--border-light); color: var(--text-secondary); border-radius: 16px; padding: 6px 14px; font-size: 0.8rem; cursor: pointer; transition: var(--transition); font-family: var(--font-sans); }
+.scan-tab:hover { border-color: var(--accent-blue); color: var(--text-primary); }
+.scan-tab.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+.scan-table-wrap { overflow-x: auto; }
+table.scan-table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 0.82rem; }
+table.scan-table th { background: var(--bg-table-header); color: var(--text-muted); font-weight: 600; font-size: 0.72rem; padding: 9px 10px; text-align: left; border-bottom: 2px solid var(--border); white-space: nowrap; }
+table.scan-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+table.scan-table tr:hover td { background: var(--bg-hover); }
+.scan-bar-cell { min-width: 120px; }
+.scan-bar { height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; position: relative; }
+.scan-bar .b-fill { height: 100%; border-radius: 4px; }
+.scan-bar .b-pos { background: var(--accent-green); }
+.scan-bar .b-neg { background: var(--accent-red); }
+.disclaimer { font-size: 0.72rem; color: var(--text-muted); line-height: 1.6; padding: 10px 12px; background: var(--bg-secondary); border: 1px dashed var(--border-light); border-radius: 8px; margin-top: 14px; }
+.disclaimer b { color: var(--accent-orange); }
+</style>
+</head>
+<body>
+<!-- 顶部栏 -->
+<div class="top-bar">
+  <div class="logo"><span class="dot"></span>HK Broker Monitor</div>
+  <div class="live-indicator"><span class="live-dot"></span>实时追踪中</div>
+  <div class="time-info" id="currentTime">--</div>
+</div>
+
+<!-- 主容器 -->
+<div class="main-container" id="app">
+  <!-- 说明面板（已隐藏：上线后无需向访客展示本地运行指引） -->
+  <div class="hint" id="hintBox" style="display:none;">
+    <span class="h-icon">💡</span>
+    <div>
+      持仓数据由本地脚本 <code>python fetch_ccass.py -c 00700 09988 -m 12</code> 抓取港交所 CCASS 后写入 <code>data/holdings.json</code>。
+      请用本地静态服务打开（<code>python -m http.server 8000</code> → 访问 <code>http://localhost:8000</code>），<strong>直接双击打开（file://）会被浏览器 CORS 拦截而读不到 JSON</strong>。
+      当前若显示的是<span class="fake-data">示例数据</span>，请运行脚本生成真实数据。<a href="README.md" target="_blank">查看完整说明 →</a>
+    </div>
+  </div>
+
+  <!-- 加载/错误态：数据未就绪时显示，覆盖在内容区上方 -->
+  <div class="state-box hidden" id="stateBox">
+    <div class="big" id="stateIcon">⏳</div>
+    <div class="title" id="stateTitle">加载中…</div>
+    <div class="desc" id="stateDesc"></div>
+  </div>
+
+  <!-- 股票选择器 -->
+  <div class="stock-selector-bar">
+    <label for="stockSelect">📊 选择股票：</label>
+    <select id="stockSelect"></select>
+    <label for="customCode" style="font-size:0.78rem;color:var(--text-muted);">或输入代码：</label>
+    <input class="custom-code" id="customCode" type="text" inputmode="numeric" placeholder="如 01810" style="max-width:140px;">
+    <button class="fetch-btn" id="fetchBtn" title="用该代码抓取（需在本机运行脚本或本地代理，见 README）">＋ 查询此股票</button>
+    <div class="stock-info-pills" id="stockPills"></div>
+  </div>
+
+  <!-- 预警横幅 -->
+  <div class="alert-banner hidden" id="alertBanner">
+    <span class="alert-icon">⚠️</span>
+    <div class="alert-content" id="alertContent"></div>
+  </div>
+
+  <!-- 内容区域 -->
+  <div class="content-grid">
+    <!-- 左栏：前十经纪商表格 -->
+    <div class="card" id="tableCard">
+      <div class="card-header">
+        <span class="card-title"><span class="icon">🏦</span>前十大经纪商持股排名</span>
+        <span class="card-badge" id="tableBadge">--</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>排名</th><th>经纪商</th><th>持股比例(%)</th><th>环比变化</th><th>标记</th></tr></thead>
+          <tbody id="top10TableBody"></tbody>
+        </table>
+      </div>
+      <div class="dropped-section hidden" id="droppedSection">
+        <div class="section-subtitle">📉 已跌出前十的追踪机构</div>
+        <div id="droppedList"></div>
+      </div>
+    </div>
+
+    <!-- 右栏：持股比例变化图 -->
+    <div class="card full-width-card" style="grid-column: span 1;" id="chartCard">
+      <div class="card-header">
+        <span class="card-title"><span class="icon">📈</span>经纪商持股比例变化（可任意比较）</span>
+        <span class="card-badge" id="chartBadge">近12个月趋势</span>
+      </div>
+      <div class="chart-container"><canvas id="holdingChart"></canvas></div>
+      <div class="custom-legend" id="customLegend"></div>
+      <!-- 经纪商多选器：可搜索、可勾选任意经纪商加入折线图 -->
+      <div class="chart-picker">
+        <div class="picker-head">
+          <label>🔎 选择要比较的经纪商：</label>
+          <input class="picker-search" id="pickerSearch" type="text" placeholder="搜索经纪商名称 / ID…">
+          <div class="picker-actions">
+            <button class="mini-btn" id="pickerTracked">仅著名投行</button>
+            <button class="mini-btn" id="pickerTop10">当前前十</button>
+            <button class="mini-btn" id="pickerClear">清空</button>
+          </div>
+        </div>
+        <div class="chip-row" id="brokerChips"></div>
+      </div>
+    </div>
+
+    <!-- 环比增持排行榜 -->
+    <div class="card full-width-card" id="gainersCard">
+      <div class="card-header">
+        <span class="card-title"><span class="icon">🚀</span>环比增持排行（近一月增持最多）</span>
+        <span class="card-badge" id="gainersBadge">Top 10</span>
+      </div>
+      <div id="gainersList"></div>
+    </div>
+
+    <!-- 全部经纪持股排行 -->
+    <div class="card full-width-card" id="fullCard">
+      <div class="card-header">
+        <span class="card-title"><span class="icon">📋</span>全部经纪持股排行</span>
+        <span class="card-badge" id="fullBadge">--</span>
+      </div>
+      <div class="full-table-controls">
+        <input id="fullSearch" type="text" placeholder="搜索经纪商名称 / 参与者ID…">
+        <select id="fullSort">
+          <option value="holding">按持股比例降序</option>
+          <option value="shareholding">按持股数降序</option>
+          <option value="changeUp">按环比增持降序</option>
+          <option value="changeDown">按环比减持降序</option>
+        </select>
+      </div>
+      <div id="fullList"></div>
+      <div class="pager">
+        <span id="fullCount"></span>
+        <button id="fullPrev">上一页</button>
+        <button id="fullNext">下一页</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 分析看板：机构合力 & 投资建议 ========== -->
+  <div class="card full-width-card" id="verdictCard">
+    <div class="card-header">
+      <span class="card-title"><span class="icon">🧭</span>机构合力方向 & 投资建议（当前股票）</span>
+      <span class="card-badge" id="verdictBadge">--</span>
+    </div>
+    <div class="verdict-hero">
+      <div class="verdict-score-wrap">
+        <div class="verdict-score" id="verdictScore"><span class="num" id="verdictNum">--</span><span class="lbl">机构合力分</span></div>
+        <span class="verdict-action" id="verdictAction">--</span>
+      </div>
+      <div>
+        <div class="verdict-text" id="verdictText">加载中…</div>
+        <div class="metric-grid" id="verdictMetrics"></div>
+      </div>
+    </div>
+    <div class="disclaimer">⚠️ <b>声明：</b>以上结论仅基于 CCASS 持仓变化的量化统计，<b>不构成投资建议</b>。持仓集中度与股价无必然因果，机构亦可能因托管/做市等非投研原因调仓。请结合基本面、估值与自身风险承受能力独立判断。</div>
+  </div>
+
+  <!-- 机构动向明细（个股） -->
+  <div class="card full-width-card" id="moveCard">
+    <div class="card-header">
+      <span class="card-title"><span class="icon">🔀</span>著名机构动向明细（动作标签）</span>
+      <span class="card-badge" id="moveBadge">--</span>
+    </div>
+    <div class="inst-move-row" style="border-bottom:2px solid var(--border);color:var(--text-muted);font-size:0.72rem;font-weight:600;letter-spacing:0.4px;">
+      <span>#</span><span>机构</span><span style="text-align:right;">最新持股</span><span style="text-align:right;">期间变化</span><span>动作</span>
+    </div>
+    <div id="moveList"></div>
+  </div>
+
+  <!-- 多股对比扫描器 -->
+  <div class="card full-width-card" id="scanCard">
+    <div class="card-header">
+      <span class="card-title"><span class="icon">📊</span>多股对比扫描器（追随机构合力选股）</span>
+      <span class="card-badge" id="scanBadge">--</span>
+    </div>
+    <div class="scan-tabs" id="scanTabs"></div>
+    <div class="scan-table-wrap">
+      <table class="scan-table">
+        <thead><tr>
+          <th>股票</th><th>机构合力分</th><th>建议</th>
+          <th>净增减(占股本%)</th><th>净增减人数</th>
+          <th>建仓机构</th><th>减持机构</th><th class="scan-bar-cell">合力强度</th>
+        </tr></thead>
+        <tbody id="scanBody"></tbody>
+      </table>
+    </div>
+    <div class="disclaimer">说明：合力分 = 净增减占比 × 权重 + 趋势/背离/集中度等修正，范围约 −100~+100。正分越大代表著名机构越一致地<b>增持</b>，负分越大代表越一致<b>减持</b>。可点击表头按列排序。</div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // ============ 时间更新 ============
+  function updateTime() {
+    const now = new Date();
+    const str = now.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    document.getElementById('currentTime').textContent = '🕐 ' + str;
+  }
+  updateTime(); setInterval(updateTime, 10000);
+
+  // ============ 著名机构投行定义（颜色/简称；与脚本 trackedData 的 instId 对应）============
+  const TRACKED_INSTITUTIONS = [
+    { id: 'hsbc',          name: '汇丰银行 (HSBC)',            color: '#f04343', shortName: '汇丰' },
+    { id: 'jpmorgan',      name: '摩根大通 (JPMorgan)',        color: '#3b82f6', shortName: '摩根大通' },
+    { id: 'citigroup',     name: '花旗银行 (Citigroup)',       color: '#06b6d4', shortName: '花旗' },
+    { id: 'ubs',           name: '瑞银集团 (UBS)',             color: '#f59e0b', shortName: '瑞银' },
+    { id: 'goldman',       name: '高盛 (Goldman Sachs)',       color: '#8b5cf6', shortName: '高盛' },
+    { id: 'morganstanley', name: '摩根士丹利 (Morgan Stanley)', color: '#00d4aa', shortName: '摩根士丹利' },
+    { id: 'merrill',       name: '美林 (Merrill Lynch)',       color: '#e879f9', shortName: '美林' },
+    { id: 'barclays',      name: '巴克莱 (Barclays)',          color: '#fb923c', shortName: '巴克莱' },
+  ];
+
+  // ============ 数据与状态 ============
+  let dataset = null;          // 从 holdings.json 加载的完整数据集
+  let isSampleData = false;    // 是否为示例数据（非真实抓取）
+  let currentStockCode = null;
+  let chartInstance = null;
+  let selectedBrokerIds = [];  // 当前在折线图中选中的参与者ID列表（按选择顺序）
+  const CHART_PALETTE = ['#f04343','#3b82f6','#06b6d4','#f59e0b','#8b5cf6','#00d4aa','#e879f9','#fb923c','#22c55e','#ec4899','#0ea5e9','#a855f7','#eab308','#14b8a6','#f97316','#6366f1'];
+  let fullPage = 1;
+  const FULL_PAGE_SIZE = 15;
+  // 分析看板状态
+  let scanSortKey = 'score';
+  let scanSortDesc = true;
+
+  // ============ DOM引用 ============
+  const stockSelect   = document.getElementById('stockSelect');
+  const customCode    = document.getElementById('customCode');
+  const fetchBtn      = document.getElementById('fetchBtn');
+  const top10TableBody= document.getElementById('top10TableBody');
+  const alertBanner   = document.getElementById('alertBanner');
+  const alertContent  = document.getElementById('alertContent');
+  const droppedSection= document.getElementById('droppedSection');
+  const droppedList   = document.getElementById('droppedList');
+  const customLegend  = document.getElementById('customLegend');
+  const stockPills    = document.getElementById('stockPills');
+  const tableBadge    = document.getElementById('tableBadge');
+  const chartBadge    = document.getElementById('chartBadge');
+  const chartCanvas   = document.getElementById('holdingChart');
+  const stateBox      = document.getElementById('stateBox');
+  const stateIcon     = document.getElementById('stateIcon');
+  const stateTitle    = document.getElementById('stateTitle');
+  const stateDesc     = document.getElementById('stateDesc');
+  const hintBox       = document.getElementById('hintBox');
+  // 新增组件
+  const pickerSearch  = document.getElementById('pickerSearch');
+  const pickerTracked = document.getElementById('pickerTracked');
+  const pickerTop10   = document.getElementById('pickerTop10');
+  const pickerClear   = document.getElementById('pickerClear');
+  const brokerChips   = document.getElementById('brokerChips');
+  const gainersList   = document.getElementById('gainersList');
+  const gainersBadge  = document.getElementById('gainersBadge');
+  const fullSearch    = document.getElementById('fullSearch');
+  const fullSort      = document.getElementById('fullSort');
+  const fullList      = document.getElementById('fullList');
+  const fullBadge     = document.getElementById('fullBadge');
+  const fullCount     = document.getElementById('fullCount');
+  const fullPrev      = document.getElementById('fullPrev');
+  const fullNext      = document.getElementById('fullNext');
+  // 分析看板 DOM
+  const verdictCard   = document.getElementById('verdictCard');
+  const verdictScore  = document.getElementById('verdictScore');
+  const verdictNum    = document.getElementById('verdictNum');
+  const verdictAction = document.getElementById('verdictAction');
+  const verdictText   = document.getElementById('verdictText');
+  const verdictMetrics= document.getElementById('verdictMetrics');
+  const verdictBadge  = document.getElementById('verdictBadge');
+  const moveList      = document.getElementById('moveList');
+  const moveBadge     = document.getElementById('moveBadge');
+  const scanTabs      = document.getElementById('scanTabs');
+  const scanBody      = document.getElementById('scanBody');
+  const scanBadge     = document.getElementById('scanBadge');
+
+  function showState(icon, title, desc, isError) {
+    stateBox.classList.remove('hidden');
+    if (isError) stateBox.classList.add('error'); else stateBox.classList.remove('error');
+    stateIcon.textContent = icon;
+    stateTitle.textContent = title;
+    stateDesc.innerHTML = desc || '';
+  }
+  function hideState() { stateBox.classList.add('hidden'); }
+
+  // ============ 异步加载数据 ============
+  async function loadDataset() {
+    showState('⏳', '正在加载持仓数据…', '读取 <code>data/holdings.json</code>');
+    try {
+      const resp = await fetch('data/holdings.json', { cache: 'no-store' });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      if (!data || !data.stocks || Object.keys(data.stocks).length === 0) {
+        throw new Error('数据为空');
+      }
+      dataset = data;
+      // 判断是否示例数据（generatedAt 含“示例”字样）
+      isSampleData = typeof data.generatedAt === 'string' && data.generatedAt.indexOf('示例') >= 0;
+      if (isSampleData) {
+        hintBox.style.borderLeftColor = 'var(--accent-orange)';
+        const flag = hintBox.querySelector('.fake-data');
+        if (flag) flag.textContent = '示例数据（非真实抓取，仅用于预览）';
+      } else {
+        hintBox.style.borderLeftColor = 'var(--success-border)';
+      }
+      hideState();
+      populateStockSelect();
+      // 默认选第一只
+      currentStockCode = Object.keys(dataset.stocks)[0];
+      stockSelect.value = currentStockCode;
+      renderAll(currentStockCode);
+    } catch (e) {
+      console.error(e);
+      showState('❌', '无法加载持仓数据', (
+        '读取 <code>data/holdings.json</code> 失败：' + (e.message || e) + '<br><br>' +
+        '可能原因：<br>' +
+        '1) 你直接双击打开了本页面（<code>file://</code> 协议会被浏览器 CORS 拦截）。请改用本地静态服务：<br>' +
+        '&nbsp;&nbsp;&nbsp;&nbsp;<code>python -m http.server 8000</code>，然后访问 <code>http://localhost:8000/</code><br>' +
+        '2) 还没有生成数据文件。请在项目根目录运行：<br>' +
+        '&nbsp;&nbsp;&nbsp;&nbsp;<code>pip install -r requirements.txt</code><br>' +
+        '&nbsp;&nbsp;&nbsp;&nbsp;<code>python fetch_ccass.py -c 00700 09988 -m 12</code><br>' +
+        '详见 <a href="README.md" target="_blank" style="color:var(--accent-cyan)">README.md</a>。'
+      ), true);
+    }
+  }
+
+  function populateStockSelect() {
+    const codes = Object.keys(dataset.stocks);
+    stockSelect.innerHTML = codes.map(code => {
+      const s = dataset.stocks[code];
+      const label = s.name ? code + ' ' + s.name : code;
+      return '<option value="' + code + '">' + escapeHtml(label) + '</option>';
+    }).join('');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ============ 检测跌出前十 & 主力出货 ============
+  function analyzeDroppedInstitutions(stockData) {
+    const currentTop10InstIds = new Set(stockData.top10Current.filter(item => item.isTracked).map(item => item.instId));
+    const prevTop10InstIds = new Set(stockData.top10Prev.filter(item => item.instId).map(item => item.instId));
+    const dropped = [];
+    for (const prevItem of stockData.top10Prev) {
+      if (prevItem.instId && !currentTop10InstIds.has(prevItem.instId)) {
+        const trackedData = stockData.trackedData[prevItem.instId];
+        const currentHolding = trackedData ? trackedData[trackedData.length - 1] : null;
+        const prevHolding = trackedData ? trackedData[trackedData.length - 2] : null;
+        const threeMonthsAgo = trackedData ? trackedData[trackedData.length - 4] : null;
+        let isShipOut = false;
+        if (trackedData && trackedData.length >= 4) {
+          const recent3 = trackedData.slice(-4);
+          let consecutiveDrop = true;
+          for (let i = 1; i < recent3.length; i++) { if (recent3[i] == null || recent3[i] >= recent3[i - 1]) { consecutiveDrop = false; break; } }
+          const totalDrop = (threeMonthsAgo != null && currentHolding != null) ? (threeMonthsAgo - currentHolding) : 0;
+          if (consecutiveDrop && totalDrop > 0.2) isShipOut = true;
+        }
+        const instInfo = TRACKED_INSTITUTIONS.find(inst => inst.id === prevItem.instId);
+        dropped.push({
+          instId: prevItem.instId,
+          brokerName: instInfo ? instInfo.name : prevItem.broker,
+          shortName: instInfo ? instInfo.shortName : prevItem.broker,
+          currentHolding: currentHolding, prevHolding: prevHolding,
+          isShipOut: isShipOut,
+          totalDrop3m: (threeMonthsAgo != null && currentHolding != null) ? (threeMonthsAgo - currentHolding).toFixed(2) : null,
+        });
+      }
+    }
+    return dropped;
+  }
+
+  // ============ 渲染预警横幅 ============
+  // 阈值：前十大经纪商环比变化（百分点）。≤ 此值即视为「显著减持」，在顶部警告。
+  const REDUCE_WARN_THRESHOLD = -3;  // 环比减持 ≥ 3 个百分点（含 3）即提示
+
+  function renderAlertBanner(droppedInstitutions, stockData) {
+    // ① 跌出前十的机构
+    const shipOutList = droppedInstitutions.filter(d => d.isShipOut);
+    const otherDropped = droppedInstitutions.filter(d => !d.isShipOut);
+
+    // ② 前十大里环比减持 ≥ 3 个百分点「且持股数量也减少」的经纪商
+    // 关键：比例下降可能只是分母（总股本）变大所致（如配售/增发），
+    //       若持股数量没变甚至增加，则非真减持，不应误报。
+    const prevShMap = {};
+    (stockData && stockData.top10Prev ? stockData.top10Prev : []).forEach(p => {
+      if (p.participant_id) prevShMap[p.participant_id] = p.shareholding;
+    });
+    const bigReducers = (stockData && stockData.top10Current)
+      ? stockData.top10Current.filter(it => {
+          if (it.change == null || it.change > REDUCE_WARN_THRESHOLD) return false;
+          // 必须持股数量也减少才算真减持
+          const curSh = it.shareholding;
+          const prevSh = prevShMap[it.participant_id];
+          if (curSh == null || prevSh == null || prevSh === 0) return false;  // 股数无法对比则不报
+          return curSh < prevSh;  // 股数严格减少才警告
+        })
+      : [];
+
+    // 两者都无 → 隐藏横幅
+    if (droppedInstitutions.length === 0 && bigReducers.length === 0) {
+      alertBanner.classList.add('hidden');
+      return;
+    }
+    alertBanner.classList.remove('hidden');
+
+    let html = '';
+    // —— 跌出前十：主力出货 ——
+    if (shipOutList.length > 0) {
+      const names = shipOutList.map(d => d.shortName).join('、');
+      html += '<span class="alert-tag">主力出货警示</span> <strong>' + escapeHtml(names) + '等主力持续减持，已跌出前十持仓！</strong>';
+      if (shipOutList.length === 1 && shipOutList[0].totalDrop3m) {
+        html += ' 近3个月累计减持约<span style="color:#ff5c6c;font-weight:700;">' + escapeHtml(shipOutList[0].totalDrop3m) + '个百分点</span>。';
+      }
+      if (otherDropped.length > 0 || bigReducers.length > 0) html += '<br>';
+    }
+    if (otherDropped.length > 0) {
+      const otherNames = otherDropped.map(d => d.shortName).join('、');
+      const curList = otherDropped.map(d => (d.currentHolding != null ? d.currentHolding.toFixed(2) + '%' : '—')).join('、');
+      html += '📉 <strong>' + escapeHtml(otherNames) + '</strong>也已跌出前十持仓排名，当前持股比例分别降至' + escapeHtml(curList) + '，请密切关注后续动向。';
+      if (bigReducers.length > 0) html += '<br>';
+    }
+    // —— 仍在榜但环比大幅减持（比例≥3个百分点 且 持股数量也减少）——
+    if (bigReducers.length > 0) {
+      // 按比例减持幅度排序（减得最多的排前）
+      const sorted = bigReducers.slice().sort((a, b) => a.change - b.change);
+      const list = sorted.map(it => {
+        const curSh = it.shareholding;
+        const prevSh = prevShMap[it.participant_id];
+        const shChg = (prevSh && prevSh > 0) ? (curSh - prevSh) / prevSh * 100 : null;
+        const shTxt = (shChg != null) ? '（持股量' + shChg.toFixed(1) + '%）' : '';
+        return escapeHtml(it.broker) + ' <span style="color:#ff5c6c;font-weight:700;">比例' + it.change.toFixed(2) + '%</span>' + shTxt;
+      }).join('、');
+      html += '<span class="alert-tag">⚠️ 环比大幅减持</span> 前十大经纪商中，<strong>' + list +
+              '</strong> 单月减持超过' + Math.abs(REDUCE_WARN_THRESHOLD) + '个百分点且持股量下降，需警惕主力出货。';
+    }
+    alertContent.innerHTML = html;
+  }
+
+  // ============ 渲染跌出前十区域 ============
+  function renderDroppedSection(droppedInstitutions) {
+    if (droppedInstitutions.length === 0) { droppedSection.classList.add('hidden'); return; }
+    droppedSection.classList.remove('hidden');
+    let html = '';
+    droppedInstitutions.forEach(d => {
+      const shipTag = d.isShipOut ? '<span class="ship-out-tag">🚨 主力出货</span>' : '';
+      const rankInfo = (d.currentHolding != null)
+        ? '<span class="current-rank">当前持股:<strong>' + d.currentHolding.toFixed(2) + '%</strong></span>' : '';
+      html += '<div class="dropped-item"><span class="broker-name">' + escapeHtml(d.brokerName) + '</span>' + rankInfo + ' ' + shipTag + '</div>';
+    });
+    droppedList.innerHTML = html;
+  }
+
+  // ============ 渲染前十表格 ============
+  function renderTop10Table(stockData, droppedInstitutions) {
+    let html = '';
+    stockData.top10Current.forEach(item => {
+      const chg = item.change;
+      let changeClass, changeText;
+      if (chg == null) { changeClass = 'change-neutral'; changeText = '—'; }
+      else if (chg > 0) { changeClass = 'change-up'; changeText = '+' + chg.toFixed(2) + '%'; }
+      else if (chg < 0) { changeClass = 'change-down'; changeText = chg.toFixed(2) + '%'; }
+      else { changeClass = 'change-neutral'; changeText = '0.00%'; }
+      const rankClass = item.rank <= 3 ? 'rank-badge top3' : 'rank-badge';
+      let tagHtml = '';
+      if (item.isTracked) {
+        const instInfo = TRACKED_INSTITUTIONS.find(inst => inst.id === item.instId);
+        if (instInfo) tagHtml = '<span class="inst-tag tracked">★ 追踪</span>';
+      }
+      const rowClass = item.isTracked ? 'highlight-row' : '';
+      const holdingText = (item.holding != null) ? item.holding.toFixed(2) + '%' : '—';
+      html += '<tr class="' + rowClass + '"><td><span class="' + rankClass + '">' + item.rank + '</span></td>' +
+        '<td><strong>' + escapeHtml(item.broker) + '</strong>' + tagHtml + '</td>' +
+        '<td style="font-weight:600;">' + holdingText + '</td>' +
+        '<td class="' + changeClass + '">' + changeText + '</td>' +
+        '<td>' + (item.isTracked ? '🔍' : '—') + '</td></tr>';
+    });
+    top10TableBody.innerHTML = html;
+  }
+
+  // ============ 更新股票信息药丸 ============
+  function updateStockPills(stockData) {
+    const months = dataset.months || stockData.months || [];
+    const curMonth = months[months.length - 1] || '--';
+    const genAt = isSampleData ? '示例数据' : (dataset.generatedAt ? formatGenAt(dataset.generatedAt) : '--');
+    const capPill = stockData.marketCap ? '<span class="info-pill">市值:<span class="val">' + escapeHtml(stockData.marketCap) + '</span></span>' : '';
+    const pricePill = stockData.price ? '<span class="info-pill">股价:<span class="val">HK$' + escapeHtml(stockData.price) + '</span></span>' : '';
+    stockPills.innerHTML =
+      capPill + pricePill +
+      '<span class="info-pill">数据月:<span class="val">' + escapeHtml(curMonth) + '</span></span>' +
+      '<span class="info-pill" title="数据生成时间">更新:<span class="val">' + escapeHtml(genAt) + '</span></span>';
+    tableBadge.textContent = curMonth || '--';
+    chartBadge.textContent = '近' + months.length + '个月趋势';
+  }
+
+  function formatGenAt(s) {
+    // 形如 2026-07-31T20:00:00+08:00 → 取日期+时间到分
+    const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(s);
+    return m ? m[1] + ' ' + m[2] : s.slice(0, 16);
+  }
+
+  // ============ 通用：从 series 计算「环比变化」与「最新值」 ============
+  function seriesLast(series) {
+    if (!series || !series.length) return null;
+    for (let i = series.length - 1; i >= 0; i--) if (series[i] != null) return series[i];
+    return null;
+  }
+  // 最新有值点 - 上一个有值点（占百分点）
+  function seriesChange(series) {
+    if (!series || series.length < 2) return null;
+    const vals = series.filter(v => v != null);
+    if (vals.length < 2) return null;
+    return vals[vals.length - 1] - vals[vals.length - 2];
+  }
+  function brokerColor(pid) {
+    // 著名投行用固定色，其余按 id 哈希到调色板
+    const p = (dataset && dataset.stocks[currentStockCode] ? dataset.stocks[currentStockCode].allParticipants : []).find(x => x.id === pid);
+    if (p && p.instId) {
+      const inst = TRACKED_INSTITUTIONS.find(i => i.id === p.instId);
+      if (inst) return inst.color;
+    }
+    let h = 0; for (let i = 0; i < pid.length; i++) h = (h * 31 + pid.charCodeAt(i)) >>> 0;
+    return CHART_PALETTE[h % CHART_PALETTE.length];
+  }
+
+  // ============ 渲染图表（基于 selectedBrokerIds）============
+  function renderChart(stockData, droppedInstitutions) {
+    const ctx = chartCanvas.getContext('2d');
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+    const datasets = [];
+    const months = dataset.months || stockData.months || [];
+    const yearLabels = months.map(m => { const p = m.split('-'); return p[0].slice(2) + '年' + parseInt(p[1], 10) + '月'; });
+    const all = stockData.allParticipants || [];
+    const byId = {}; all.forEach(p => byId[p.id] = p);
+    const droppedInstIds = new Set(droppedInstitutions.map(d => d.instId));
+
+    selectedBrokerIds.forEach((pid, idx) => {
+      const p = byId[pid];
+      if (!p) return;
+      const data = (p.series && p.series.length === months.length) ? p.series
+        : months.map((_, i) => (p.series && p.series[i] != null) ? p.series[i] : null);
+      if (data.every(v => v == null)) return;
+      const color = brokerColor(pid);
+      const isDropped = p.instId && droppedInstIds.has(p.instId);
+      const label = (p.instId ? '★ ' : '') + p.name;
+      datasets.push({
+        label: label, _pid: pid,
+        data: data, borderColor: color, backgroundColor: hexToRgba(color, 0.1),
+        borderWidth: 2.4, borderDash: isDropped ? [8, 4] : [],
+        pointRadius: data.map((_, i) => i === data.length - 1 ? 5 : 2),
+        pointBackgroundColor: data.map((_, i) => i === data.length - 1 ? (isDropped ? '#ff4757' : color) : color),
+        pointBorderColor: '#fff', pointHoverRadius: 7, tension: 0.3, fill: false,
+      });
+    });
+
+    // 前十门槛参考线
+    const thresholdValue = stockData.top10Current[9] && stockData.top10Current[9].holding != null
+      ? stockData.top10Current[9].holding : 1.0;
+    datasets.push({
+      label: '前十门槛(参考)', data: Array(months.length).fill(thresholdValue),
+      borderColor: 'rgba(160,168,181,0.5)', borderWidth: 1.5, borderDash: [4, 6],
+      pointRadius: 0, pointHoverRadius: 0, tension: 0, fill: false, order: 99,
+    });
+
+    chartInstance = new Chart(ctx, {
+      type: 'line',
+      data: { labels: yearLabels, datasets: datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(24,31,42,0.95)', titleColor: '#e0e4ea', bodyColor: '#e0e4ea',
+            borderColor: '#2a3342', borderWidth: 1, padding: 12,
+            titleFont: { size: 12, weight: '600' },
+            bodyFont: { size: 11, family: "'SF Mono','Consolas',monospace" },
+            callbacks: {
+              label: function(ctx) {
+                if (ctx.dataset.label === '前十门槛(参考)') return '前十门槛 ≈ ' + (ctx.parsed.y != null ? ctx.parsed.y.toFixed(2) + '%' : '—');
+                if (ctx.parsed.y == null) return ctx.dataset.label + ': 无数据';
+                return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(2) + '%';
+              },
+            },
+          },
+        },
+        scales: {
+          x: { ticks: { color: '#a0a8b5', font: { size: 10 }, maxRotation: 45 }, grid: { color: 'rgba(37,45,58,0.5)' } },
+          y: { ticks: { color: '#a0a8b5', font: { size: 10 }, callback: function(v) { return v.toFixed(1) + '%'; } },
+               grid: { color: 'rgba(37,45,58,0.5)' }, title: { display: true, text: '持股比例 (%)', color: '#6b7385', font: { size: 10 } } },
+        },
+      },
+    });
+    renderCustomLegend(droppedInstIds, thresholdValue);
+  }
+
+  function hexToRgba(hex, alpha) {
+    const m = /^#([0-9a-f]{6})$/i.exec(hex);
+    if (!m) return hex;
+    const r = parseInt(m[1].slice(0,2),16), g = parseInt(m[1].slice(2,4),16), b = parseInt(m[1].slice(4,6),16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+  }
+
+  // 图例 = 当前选中经纪商的颜色块（点击切换显隐）
+  function renderCustomLegend(droppedInstIds, thresholdValue) {
+    let html = '';
+    selectedBrokerIds.forEach(pid => {
+      const p = (dataset.stocks[currentStockCode].allParticipants || []).find(x => x.id === pid);
+      if (!p) return;
+      const color = brokerColor(pid);
+      const label = (p.instId ? '★ ' : '') + p.name;
+      html += '<span class="legend-item" data-pid="' + pid + '" title="' + escapeHtml(p.name + (p.id ? ' (' + p.id + ')' : '')) + '">' +
+        '<span class="legend-dot" style="background:' + color + ';"></span>' + escapeHtml(label) + '</span>';
+    });
+    html += '<span class="legend-item" style="opacity:0.6;cursor:default;" title="前十门槛参考线">' +
+      '<span class="legend-dot dashed-indicator" style="border-top-color:rgba(160,168,181,0.6);"></span>前十门槛≈' + thresholdValue.toFixed(2) + '%</span>';
+    customLegend.innerHTML = html;
+    customLegend.querySelectorAll('.legend-item[data-pid]').forEach(item => {
+      item.addEventListener('click', function() {
+        const pid = this.getAttribute('data-pid');
+        if (!chartInstance) return;
+        const idx = chartInstance.data.datasets.findIndex(ds => ds._pid === pid);
+        if (idx >= 0) {
+          const meta = chartInstance.getDatasetMeta(idx);
+          meta.hidden = !meta.hidden;
+          this.classList.toggle('dimmed', meta.hidden);
+          chartInstance.update();
+        }
+      });
+    });
+  }
+
+  // ============ 经纪商多选 chips ============
+  function renderBrokerChips() {
+    const stockData = dataset.stocks[currentStockCode];
+    if (!stockData) return;
+    const all = stockData.allParticipants || [];
+    const q = (pickerSearch.value || '').trim().toLowerCase();
+    // 排序：著名投行优先，再按持股比例降序
+    const sorted = all.slice().sort((a, b) => {
+      const ta = a.instId ? 0 : 1, tb = b.instId ? 0 : 1;
+      if (ta !== tb) return ta - tb;
+      return (seriesLast(b.series) || 0) - (seriesLast(a.series) || 0);
+    });
+    let list = sorted;
+    if (q) list = sorted.filter(p => (p.name || '').toLowerCase().indexOf(q) >= 0 || (p.id || '').toLowerCase().indexOf(q) >= 0);
+    // 截断避免一次渲染过多（搜索时不限）
+    const shown = q ? list.slice(0, 200) : list.slice(0, 80);
+    let html = '';
+    shown.forEach(p => {
+      const sel = selectedBrokerIds.indexOf(p.id) >= 0 ? ' selected' : '';
+      const trackedCls = p.instId ? ' tracked-tag' : '';
+      const color = brokerColor(p.id);
+      const lastV = seriesLast(p.series);
+      const lastTxt = (lastV != null) ? lastV.toFixed(2) + '%' : '—';
+      html += '<span class="chip' + sel + trackedCls + '" data-pid="' + p.id + '" title="' + escapeHtml(p.name + ' (' + p.id + ')  最新 ' + lastTxt) + '">' +
+        '<span class="swatch" style="background:' + color + ';"></span>' +
+        escapeHtml(p.name.length > 18 ? p.name.slice(0, 18) + '…' : p.name) +
+        ' <span style="opacity:0.6;font-family:var(--font-mono);">' + lastTxt + '</span></span>';
+    });
+    if (!shown.length) html = '<span style="color:var(--text-muted);font-size:0.8rem;">无匹配经纪商</span>';
+    brokerChips.innerHTML = html;
+    brokerChips.querySelectorAll('.chip[data-pid]').forEach(chip => {
+      chip.addEventListener('click', function() {
+        const pid = this.getAttribute('data-pid');
+        const i = selectedBrokerIds.indexOf(pid);
+        if (i >= 0) selectedBrokerIds.splice(i, 1); else selectedBrokerIds.push(pid);
+        // 限制最多 12 条，避免图表太乱
+        if (selectedBrokerIds.length > 12) selectedBrokerIds.shift();
+        renderBrokerChips();
+        renderChart(dataset.stocks[currentStockCode], analyzeDroppedInstitutions(dataset.stocks[currentStockCode]));
+      });
+    });
+  }
+
+  function defaultSelection(stockData) {
+    // 默认：选当前前十中被追踪的投行；若无则选前若干持股最大者
+    const all = stockData.allParticipants || [];
+    const trackedTop = all.filter(p => p.instId).sort((a, b) => (seriesLast(b.series) || 0) - (seriesLast(a.series) || 0)).slice(0, 8);
+    if (trackedTop.length) return trackedTop.map(p => p.id);
+    return all.slice().sort((a, b) => (seriesLast(b.series) || 0) - (seriesLast(a.series) || 0)).slice(0, 6).map(p => p.id);
+  }
+
+  // ============ 环比增持排行 ============
+  function renderGainers(stockData) {
+    const all = stockData.allParticipants || [];
+    const enriched = all.map(p => ({ p: p, change: seriesChange(p.series), last: seriesLast(p.series) }))
+      .filter(x => x.change != null);
+    const gainers = enriched.sort((a, b) => b.change - a.change).slice(0, 10);
+    const maxChg = gainers.length ? Math.max(...gainers.map(g => Math.abs(g.change)), 0.0001) : 1;
+    let html = '';
+    if (!gainers.length) {
+      gainersList.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:12px;">历史不足两个月，无法计算环比变化。</div>';
+      gainersBadge.textContent = 'Top 10';
+      return;
+    }
+    gainers.forEach((g, i) => {
+      const rkClass = i < 3 ? 'rk top' : 'rk';
+      const widthPct = Math.abs(g.change) / maxChg * 100;
+      const barColor = g.change > 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+      const chgCls = g.change > 0 ? 'up' : (g.change < 0 ? 'down' : 'flat');
+      const chgTxt = (g.change > 0 ? '+' : '') + g.change.toFixed(2) + '%';
+      const tag = g.p.instId ? '<span class="tid">★</span>' : '';
+      html += '<div class="rank-row">' +
+        '<span class="' + rkClass + '">' + (i + 1) + '</span>' +
+        '<span class="name">' + escapeHtml(g.p.name) + tag +
+          '<span class="bar-track" style="width:' + widthPct.toFixed(0) + '%;display:block;"><span class="bar-fill" style="width:100%;background:' + barColor + ';"></span></span>' +
+        '</span>' +
+        '<span class="val">' + (g.last != null ? g.last.toFixed(2) + '%' : '—') + '</span>' +
+        '<span class="chg ' + chgCls + '">' + chgTxt + '</span>' +
+        '</div>';
+    });
+    gainersList.innerHTML = html;
+    gainersBadge.textContent = 'Top ' + gainers.length + ' · 最新月';
+  }
+
+  // ============ 全部经纪持股排行（搜索 + 排序 + 分页）============
+  function renderFullTable(stockData) {
+    const all = stockData.allParticipants || [];
+    const q = (fullSearch.value || '').trim().toLowerCase();
+    const sortMode = fullSort.value;
+    let enriched = all.map(p => ({ p: p, last: seriesLast(p.series), change: seriesChange(p.series) }));
+    if (q) enriched = enriched.filter(x => (x.p.name || '').toLowerCase().indexOf(q) >= 0 || (x.p.id || '').toLowerCase().indexOf(q) >= 0);
+    enriched.sort((a, b) => {
+      if (sortMode === 'shareholding') return (b.p.shareholding || 0) - (a.p.shareholding || 0);
+      if (sortMode === 'changeUp') return (b.change || -1e9) - (a.change || -1e9);
+      if (sortMode === 'changeDown') return (a.change == null ? 1e9 : a.change) - (b.change == null ? 1e9 : b.change);
+      return (b.last || 0) - (a.last || 0); // holding
+    });
+    const total = enriched.length;
+    const maxH = enriched.length ? Math.max(...enriched.map(e => e.last || 0), 0.0001) : 1;
+    const totalPages = Math.max(1, Math.ceil(total / FULL_PAGE_SIZE));
+    if (fullPage > totalPages) fullPage = totalPages;
+    if (fullPage < 1) fullPage = 1;
+    const slice = enriched.slice((fullPage - 1) * FULL_PAGE_SIZE, fullPage * FULL_PAGE_SIZE);
+    let html = '';
+    slice.forEach((x, i) => {
+      const rank = (fullPage - 1) * FULL_PAGE_SIZE + i + 1;
+      const rkClass = rank <= 3 ? 'rk top' : 'rk';
+      const chg = x.change;
+      const chgCls = chg == null ? 'flat' : (chg > 0 ? 'up' : (chg < 0 ? 'down' : 'flat'));
+      const chgTxt = chg == null ? '—' : ((chg > 0 ? '+' : '') + chg.toFixed(2) + '%');
+      const tag = x.p.instId ? '<span class="tid">★</span>' : '';
+      const widthPct = Math.min(100, (x.last || 0) / maxH * 100);
+      html += '<div class="rank-row">' +
+        '<span class="' + rkClass + '">' + rank + '</span>' +
+        '<span class="name">' + escapeHtml(x.p.name) + tag +
+          '<span style="font-size:0.7rem;color:var(--text-muted);font-family:var(--font-mono);"> ' + escapeHtml(x.p.id) + '</span>' +
+          '<span class="bar-track" style="width:' + widthPct.toFixed(0) + '%;display:block;"><span class="bar-fill"></span></span>' +
+        '</span>' +
+        '<span class="val">' + (x.last != null ? x.last.toFixed(2) + '%' : '—') + '</span>' +
+        '<span class="chg ' + chgCls + '">' + chgTxt + '</span>' +
+        '</div>';
+    });
+    if (!slice.length) html = '<div style="color:var(--text-muted);font-size:0.85rem;padding:12px;">无匹配经纪商</div>';
+    fullList.innerHTML = html;
+    fullCount.textContent = '共 ' + total + ' 家 · 第 ' + fullPage + '/' + totalPages + ' 页';
+    fullPrev.disabled = fullPage <= 1;
+    fullNext.disabled = fullPage >= totalPages;
+    const months = dataset.months || stockData.months || [];
+    fullBadge.textContent = (months[months.length - 1] || '--') + ' · 共 ' + total + ' 家';
+  }
+
+  // ============ 分析看板：单股结论卡 ============
+  const ACTION_EMOJI = { buy: '🆕', add: '📈', watch: '⏸️', reduce: '📉', exit: '🚪' };
+  const ACTION_CN = { strong_buy: '强烈买入', buy: '买入', hold: '观望', reduce: '减仓', sell: '清仓' };
+
+  function renderVerdict(stockData) {
+    const A = window.CCASS_ANALYZE;
+    if (!A || !stockData.allParticipants || !stockData.allParticipants.some(p => p.instId)) {
+      verdictCard.classList.add('hidden');
+      moveCard_add_hidden();
+      return;
+    }
+    verdictCard.classList.remove('hidden');
+    const a = A.analyzeStock(stockData);
+    // 分数仪表
+    verdictScore.className = 'verdict-score ' + a.verdictClass;
+    verdictNum.textContent = (a.score > 0 ? '+' : '') + a.score;
+    verdictAction.className = 'verdict-action ' + a.verdictClass;
+    verdictAction.textContent = (a.score > 0 ? '▲ ' : (a.score < 0 ? '▼ ' : '● ')) + a.verdictLabel;
+    verdictText.innerHTML = a.narrative;
+    verdictBadge.textContent = '近 ' + a.months.length + ' 个月';
+
+    // 指标格
+    const cells = [
+      { k: '机构合计持仓', v: a.lastTotal + '%', cls: '' },
+      { k: '近一月净变化', v: (a.netChangeMoM > 0 ? '+' : '') + a.netChangeMoM + 'pp', cls: a.netChangeMoM > 0 ? 'up' : (a.netChangeMoM < 0 ? 'down' : '') },
+      { k: '期间净变化', v: (a.netChangePeriod > 0 ? '+' : '') + a.netChangePeriod + 'pp', cls: a.netChangePeriod > 0 ? 'up' : (a.netChangePeriod < 0 ? 'down' : '') },
+      { k: '加仓/建仓', v: a.adders + ' 家', cls: 'up' },
+      { k: '减仓/清仓', v: a.reducers + ' 家', cls: 'down' },
+      { k: '趋势斜率', v: (a.totSlope > 0 ? '+' : '') + a.totSlope + '/期', cls: a.totSlope > 0 ? 'up' : (a.totSlope < 0 ? 'down' : '') },
+    ];
+    verdictMetrics.innerHTML = cells.map(c =>
+      '<div class="metric-cell"><div class="mk">' + c.k + '</div><div class="mv ' + c.cls + '">' + c.v + '</div></div>'
+    ).join('');
+
+    // 机构动向明细
+    moveBadge.textContent = a.adders + ' 加 / ' + a.reducers + ' 减 / ' + a.watchN + ' 观望';
+    let html = '';
+    a.instMoves.forEach((m, i) => {
+      const chgCls = m.mom == null ? 'flat' : (m.mom > 0 ? 'up' : (m.mom < 0 ? 'down' : 'flat'));
+      const chgTxt = m.mom == null ? '—' : ((m.mom > 0 ? '+' : '') + m.mom.toFixed(2) + 'pp');
+      const holdTxt = m.last != null ? m.last.toFixed(2) + '%' : '—';
+      html += '<div class="inst-move-row">' +
+        '<span class="im-rk">' + (i + 1) + '</span>' +
+        '<span class="im-name">' + escapeHtml(m.name) + '</span>' +
+        '<span class="im-hold">' + holdTxt + '</span>' +
+        '<span class="im-chg ' + chgCls + '">' + chgTxt + '</span>' +
+        '<span class="move-tag ' + m.action + '">' + ACTION_EMOJI[m.action] + ' ' + m.actionLabel + '</span>' +
+        '</div>';
+    });
+    moveList.innerHTML = html;
+  }
+  // 兼容：moveCard 隐藏（因 verdictCard 用了独立隐藏逻辑）
+  function moveCard_add_hidden() { document.getElementById('moveCard').classList.add('hidden'); }
+
+  // ============ 分析看板：多股扫描对比 ============
+  function renderScan() {
+    const A = window.CCASS_ANALYZE;
+    if (!A || !dataset || Object.keys(dataset.stocks).length < 1) { scanBody.innerHTML = ''; return; }
+    let rows = A.analyzeAll(dataset);
+    rows = A.sortScanRows(rows, scanSortKey, scanSortDesc);
+    scanBadge.textContent = '共 ' + rows.length + ' 只';
+    // 标记当前排序列
+    document.querySelectorAll('#scanCard .scan-table thead th').forEach((th, i) => {
+      const isSort = SCAN_COL_MAP[i] === scanSortKey;
+      th.style.color = isSort ? 'var(--accent-cyan)' : '';
+      const base = th.textContent.replace(/\s[▲▼]$/, '').trim();
+      th.textContent = base + (isSort ? (scanSortDesc ? ' ▼' : ' ▲') : '');
+    });
+    let html = '';
+    const maxAbsNet = Math.max(0.5, ...rows.map(r => Math.abs(r.netChangeMoM || 0)));
+    rows.forEach(r => {
+      const cls = r.score >= 55 ? 'strong-buy' : r.score >= 20 ? 'buy' : r.score > -20 ? 'hold' : r.score > -55 ? 'reduce' : 'sell';
+      const emoji = r.score >= 55 ? '🚀' : r.score >= 20 ? '📈' : r.score > -20 ? '⏸️' : r.score > -55 ? '📉' : '🔻';
+      const net = r.netChangeMoM;
+      const barPct = Math.abs(net || 0) / maxAbsNet * 100;
+      const barCls = (net || 0) >= 0 ? 'b-pos' : 'b-neg';
+      const netTxt = (net == null ? '—' : ((net > 0 ? '+' : '') + net + 'pp'));
+      const name = r.name ? (r.code + ' ' + r.name) : r.code;
+      html += '<tr>' +
+        '<td><a class="scan-link" data-code="' + r.code + '" style="color:var(--accent-cyan);cursor:pointer;">' + escapeHtml(name) + '</a></td>' +
+        '<td style="font-family:var(--font-mono);font-weight:700;color:' + scoreColor(r.score) + ';">' + (r.score > 0 ? '+' : '') + r.score + '</td>' +
+        '<td><span class="move-tag ' + actionTagCls(r.score) + '">' + emoji + ' ' + r.verdictLabel.split(' ')[0] + '</span></td>' +
+        '<td style="font-family:var(--font-mono);color:' + ((net||0)>=0?'var(--accent-green)':'var(--accent-red)') + ';">' + netTxt + '</td>' +
+        '<td style="font-family:var(--font-mono);"><span style="color:var(--accent-green);">' + r.adders + '加</span> / <span style="color:var(--accent-red);">' + r.reducers + '减</span></td>' +
+        '<td style="color:var(--accent-green);">' + r.adders + '</td>' +
+        '<td style="color:var(--accent-red);">' + r.reducers + '</td>' +
+        '<td class="scan-bar-cell"><div class="scan-bar"><div class="b-fill ' + barCls + '" style="width:' + barPct.toFixed(0) + '%;"></div></div></td>' +
+        '</tr>';
+    });
+    scanBody.innerHTML = html;
+    // 点击股票名跳转
+    scanBody.querySelectorAll('.scan-link').forEach(a => {
+      a.addEventListener('click', function() {
+        const code = this.getAttribute('data-code');
+        currentStockCode = code; stockSelect.value = code; renderAll(code);
+        document.getElementById('verdictCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+  }
+  function scoreColor(s) { return s >= 55 ? 'var(--accent-green)' : s >= 20 ? '#34d399' : s > -20 ? 'var(--accent-gold)' : s > -55 ? 'var(--accent-orange)' : 'var(--accent-red)'; }
+  function actionTagCls(s) { return s >= 55 ? 'buy' : s >= 20 ? 'add' : s > -20 ? 'watch' : s > -55 ? 'reduce' : 'exit'; }
+
+  // ============ 主渲染函数 ============
+  function renderAll(stockCode) {
+    const stockData = dataset.stocks[stockCode];
+    if (!stockData) return;
+    hideState(); // 渲染有效股票时，关闭之前可能的「无该股票」提示
+    // 切换股票时重置图表选择为默认（著名投行优先）
+    selectedBrokerIds = defaultSelection(stockData);
+    pickerSearch.value = '';
+    fullPage = 1;
+    const droppedInstitutions = analyzeDroppedInstitutions(stockData);
+    updateStockPills(stockData);
+    renderAlertBanner(droppedInstitutions, stockData);
+    renderTop10Table(stockData, droppedInstitutions);
+    renderDroppedSection(droppedInstitutions);
+    renderBrokerChips();
+    renderChart(stockData, droppedInstitutions);
+    renderGainers(stockData);
+    renderFullTable(stockData);
+    renderVerdict(stockData);
+    renderScan();
+  }
+
+  // ============ 事件监听 ============
+  stockSelect.addEventListener('change', function() {
+    currentStockCode = this.value;
+    renderAll(currentStockCode);
+  });
+
+  // ---- 经纪商多选器 ----
+  pickerSearch.addEventListener('input', renderBrokerChips);
+  pickerTracked.addEventListener('click', function() {
+    const sd = dataset.stocks[currentStockCode];
+    selectedBrokerIds = (sd.allParticipants || []).filter(p => p.instId)
+      .sort((a, b) => (seriesLast(b.series) || 0) - (seriesLast(a.series) || 0)).slice(0, 12).map(p => p.id);
+    renderBrokerChips(); renderChart(sd, analyzeDroppedInstitutions(sd));
+  });
+  pickerTop10.addEventListener('click', function() {
+    const sd = dataset.stocks[currentStockCode];
+    selectedBrokerIds = (sd.allParticipants || [])
+      .sort((a, b) => (seriesLast(b.series) || 0) - (seriesLast(a.series) || 0)).slice(0, 10).map(p => p.id);
+    renderBrokerChips(); renderChart(sd, analyzeDroppedInstitutions(sd));
+  });
+  pickerClear.addEventListener('click', function() {
+    selectedBrokerIds = [];
+    const sd = dataset.stocks[currentStockCode];
+    renderBrokerChips(); renderChart(sd, analyzeDroppedInstitutions(sd));
+  });
+
+  // ---- 全部排行：搜索 / 排序 / 分页 ----
+  fullSearch.addEventListener('input', function() { fullPage = 1; renderFullTable(dataset.stocks[currentStockCode]); });
+  fullSort.addEventListener('change', function() { fullPage = 1; renderFullTable(dataset.stocks[currentStockCode]); });
+  fullPrev.addEventListener('click', function() { if (fullPage > 1) { fullPage--; renderFullTable(dataset.stocks[currentStockCode]); } });
+  fullNext.addEventListener('click', function() { fullPage++; renderFullTable(dataset.stocks[currentStockCode]); });
+
+  // ---- 多股扫描器：表头点击排序 ----
+  const SCAN_COL_MAP = ['name', 'score', 'verdict', 'netChangeMoM', 'adders', 'adders', 'reducers', 'netChangeMoM'];
+  document.querySelectorAll('#scanCard .scan-table thead th').forEach((th, i) => {
+    th.style.cursor = 'pointer';
+    th.style.userSelect = 'none';
+    th.addEventListener('click', function() {
+      const key = SCAN_COL_MAP[i];
+      if (!key) return;
+      if (scanSortKey === key) scanSortDesc = !scanSortDesc;
+      else { scanSortKey = key; scanSortDesc = (key === 'name' ? false : true); }
+      renderScan();
+    });
+  });
+
+  // 自定义代码：浏览器无法跨域直抓 CCASS，这里提供两种行为：
+  //  1) 若 JSON 中已有该代码 → 直接选中显示；
+  //  2) 否则 → 提示用户运行脚本抓取（给出可复制的命令）。
+  fetchBtn.addEventListener('click', function() {
+    const raw = customCode.value.trim();
+    if (!raw) return;
+    const code = String(raw).replace(/\D/g, '').padStart(5, '0');
+    if (!code) return;
+    if (dataset && dataset.stocks && dataset.stocks[code]) {
+      currentStockCode = code;
+      stockSelect.value = code;
+      renderAll(code);
+      return;
+    }
+    // 不在本地数据中：提示运行脚本
+    const cmd = 'python fetch_ccass.py -c ' + code + ' -m 12';
+    showState('🔎', '该股票暂无本地数据', (
+      '本地 <code>data/holdings.json</code> 中没有代码 <strong>' + code + '</strong>。<br>' +
+      '由于港交所 CCASS 页面无法被浏览器跨域直接访问，请在项目根目录运行以下命令抓取（会自动并入现有数据）：<br><br>' +
+      '<code>' + cmd + '</code><br><br>' +
+      '抓取完成后，刷新本页面即可在上方下拉框中看到该股票。<br>' +
+      '如需在浏览器内「现查现显示」，可参考 README 启用可选的本地代理（<code>python fetch_ccass.py --serve</code>）。'
+    ), false);
+  });
+  customCode.addEventListener('keydown', function(e) { if (e.key === 'Enter') fetchBtn.click(); });
+
+  // ============ 窗口大小调整 ============
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => { if (chartInstance) chartInstance.resize(); }, 250);
+  });
+
+  // ============ 键盘快捷键：在已有股票间切换 ============
+  document.addEventListener('keydown', function(e) {
+    if (!dataset) return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    const stockCodes = Object.keys(dataset.stocks);
+    const currentIndex = stockCodes.indexOf(currentStockCode);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      currentStockCode = stockCodes[(currentIndex + 1) % stockCodes.length];
+      stockSelect.value = currentStockCode; renderAll(currentStockCode);
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      currentStockCode = stockCodes[(currentIndex - 1 + stockCodes.length) % stockCodes.length];
+      stockSelect.value = currentStockCode; renderAll(currentStockCode);
+    }
+  });
+
+  // ============ 启动 ============
+  loadDataset();
+  console.log('✅ 港股经纪商持股追踪系统已就绪');
+  console.log(' ⌨️ 左右方向键切换股票；输入代码可查询');
+  console.log(' 📈 虚线折线 = 已跌出前十的机构；🚨 红色标记 = 主力出货警示');
+})();
+</script>
+</body>
+</html>

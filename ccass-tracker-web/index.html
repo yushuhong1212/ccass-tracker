@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-HK">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="港股 CCASS 经纪商持股追踪 · 机构合力分析与多股扫描" />
+    <title>CCASS Tracker · 港股经纪商持股追踪</title>
+  </head>
+  <body>
+    <script>
+      // 在 React 渲染前同步设置主题，避免暗色模式闪烁（FOUC）。
+      (function () {
+        try {
+          var k = 'ccass-theme';
+          var t = localStorage.getItem(k);
+          if (t !== 'light' && t !== 'dark') {
+            t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          if (t === 'dark') document.documentElement.classList.add('dark');
+          document.documentElement.style.colorScheme = t;
+        } catch (e) {}
+      })();
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

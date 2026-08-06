@@ -1,0 +1,7 @@
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+openpyxl>=3.1.0           # 读取港交所证券名单 XLSX（自动补全股票中文名）
+opencc-python-reimplemented>=0.1.7  # 繁→简转换（港交所名单是繁体）
+# lxml 为可选加速解析器；脚本会自动回退到 Python 内置 html.parser。
+# 若你的 Python 版本（如 3.14）暂无 lxml 预编译 wheel，可跳过安装，不影响使用。
+# lxml>=4.9.0

@@ -1,0 +1,7 @@
+{
+  "outputDirectory": "ccass-tracker-web/dist",
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/((?!assets|data/).*)", "destination": "/index.html" }
+  ]
+}

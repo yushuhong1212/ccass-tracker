@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 编辑器 / 工具
+.idea/
+.vscode/
+.zcode/
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# Vercel 项目链接（通过 GitHub Secrets 的 VERCEL_PROJECT_ID / VERCEL_ORG_ID 管理）
+.vercel/
+
+# 注意：data/ 目录需要提交（holdings.json 与 raw_cache/ 是数据，需进仓库）
+# 但港交所证券名单是运行时自动下载的缓存，不进 git：
+data/sec_list/

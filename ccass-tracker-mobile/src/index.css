@@ -1,0 +1,251 @@
+/* ============================================================
+   CCASS Tracker Mobile — Fintech Light Theme
+   Modern, clean, trustworthy financial aesthetic
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Fintech Light Palette — clean, premium, trustworthy */
+    --background: 210 40% 98%;
+    --foreground: 222 30% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 30% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 30% 12%;
+    --primary: 168 76% 36%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 30% 96%;
+    --secondary-foreground: 222 30% 12%;
+    --muted: 210 30% 96%;
+    --muted-foreground: 215 20% 55%;
+    --accent: 168 50% 95%;
+    --accent-foreground: 168 76% 30%;
+    --destructive: 0 80% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 168 76% 36%;
+    --radius: 0.625rem;
+
+    /* Sidebar (unused on mobile, kept for consistency) */
+    --sidebar-background: 210 40% 98%;
+    --sidebar-foreground: 215 20% 55%;
+    --sidebar-primary: 168 76% 36%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 30% 96%;
+    --sidebar-accent-foreground: 222 30% 12%;
+    --sidebar-border: 214 20% 90%;
+    --sidebar-ring: 168 76% 36%;
+
+    /* Financial Semantic Colors */
+    --bullish: 168 76% 36%;
+    --bearish: 0 80% 55%;
+    --warning: 35 85% 48%;
+    --info: 217 80% 50%;
+    --track-accent: 168 76% 36%;
+
+    /* Typography */
+    --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--font-sans);
+    max-width: 480px;
+    margin: 0 auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 3px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 99px;
+  }
+}
+
+/* ============ Animations ============ */
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .ios-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  .tap-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Shimmer loading */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--secondary)) 40%,
+      hsl(var(--muted)) 80%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Fade + slide up */
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-out forwards;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Staggered fade-in */
+  .stagger-1 { animation-delay: 0.05s; }
+  .stagger-2 { animation-delay: 0.10s; }
+  .stagger-3 { animation-delay: 0.15s; }
+  .stagger-4 { animation-delay: 0.20s; }
+  .stagger-5 { animation-delay: 0.25s; }
+  .stagger-6 { animation-delay: 0.30s; }
+
+  /* Scale interaction */
+  .scale-press {
+    transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .scale-press:active {
+    transform: scale(0.96);
+  }
+
+  /* Number tick animation */
+  .animate-number {
+    display: inline-block;
+    animation: numberPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes numberPop {
+    0% { opacity: 0; transform: translateY(6px) scale(0.9); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* Slide in from right */
+  .animate-slide-in {
+    animation: slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Pulse glow */
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite;
+  }
+
+  @keyframes glow {
+    0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.1); }
+    50% { box-shadow: 0 0 0 6px hsl(var(--primary) / 0.05); }
+  }
+
+  /* Card hover lift */
+  .card-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .card-lift:active {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px hsl(var(--foreground) / 0.06);
+  }
+
+  /* Glass card */
+  .glass {
+    background: hsl(var(--card) / 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Number change flash */
+  .flash-green {
+    animation: flashGreen 0.6s ease-out;
+  }
+  .flash-red {
+    animation: flashRed 0.6s ease-out;
+  }
+
+  @keyframes flashGreen {
+    0% { background-color: hsl(var(--bullish) / 0.15); }
+    100% { background-color: transparent; }
+  }
+  @keyframes flashRed {
+    0% { background-color: hsl(var(--bearish) / 0.15); }
+    100% { background-color: transparent; }
+  }
+}
+
+/* ============ Accordion overrides ============ */
+[data-state="open"] .accordion-chevron {
+  transform: rotate(180deg);
+}
+
+.accordion-chevron {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============ Bottom tab indicator ============ */
+.tab-indicator {
+  position: absolute;
+  bottom: 0;
+  height: 3px;
+  border-radius: 99px 99px 0 0;
+  background: hsl(var(--primary));
+  transition: left 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============ Gauge animation ============ */
+.gauge-needle {
+  transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============ Rank badge ============ */
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.rank-badge-1 { background: hsl(35 85% 48% / 0.15); color: hsl(35 85% 40%); }
+.rank-badge-2 { background: hsl(215 20% 55% / 0.12); color: hsl(215 20% 45%); }
+.rank-badge-3 { background: hsl(168 76% 36% / 0.12); color: hsl(168 76% 32%); }
+.rank-badge-default { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }

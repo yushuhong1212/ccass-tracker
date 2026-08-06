@@ -1,0 +1,82 @@
+name: Daily CCASS Update
+
+on:
+  schedule:
+    - cron: "0 1 * * 1-5"    # 工作日 UTC 01:00 = 北京时间 09:00
+  workflow_dispatch:          # 支持手动触发
+
+permissions:
+  contents: write             # 允许机器人提交数据
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      # 关键：港交所数据发布与「最新可查日」按香港时间判断。
+      # GitHub Actions 服务器默认 UTC，不设 TZ 会导致 datetime.now() 取到 UTC 时间，
+      # 凌晨/上午运行时误判「数据未发布」，把参考日错退一天。
+      TZ: Asia/Hong_Kong
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Show current time (timezone sanity check)
+        run: |
+          echo "服务器当前时间: $(date)"
+          echo "若上面显示的不是香港时间(HKT)，说明 TZ 未生效，日期判断会出错。"
+
+      - name: Run incremental update
+        run: python update.py -c 00020 00100 00148 00300 00700 01288 01347 01548 01810 01815 01888 02359 02388 02513 02723 02865 03308 03986 06181 06809 06869 06915 06990 09606 09660 09880 09903 09988 03317 -m 12
+
+      - name: Commit updated data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/holdings.json data/raw_cache
+          # 若无变化（如非交易日/数据未发布）则不提交，也不会触发重新部署
+          git diff --cached --quiet || git commit -m "chore: update ccass data $(date +%Y-%m-%d)"
+          # 先同步远程最新（rebase），避免因仓库被其他方式更新过而 push 被拒；
+          # holdings.json 若冲突，优先用本次 CI 抓到的最新数据（-X ours）。
+          git pull --rebase --no-edit -X ours origin main || {
+            echo "::warning::rebase 失败，放弃本次提交以免覆盖远程。"
+            git rebase --abort
+            exit 0
+          }
+          git push
+
+      # ============ 构建 React 版前端并部署到 Vercel ============
+      # Vercel 替代 CloudBase：runner → Vercel 全球 CDN（日本/新加坡节点），网络稳定，
+      # 不会出现"User network is too slow"问题。自定义域名在 Vercel 后台绑定即可。
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: 'npm'
+          cache-dependency-path: ccass-tracker-web/package.json
+
+      - name: Sync latest holdings.json into React project
+        run: |
+          mkdir -p ccass-tracker-web/public/data
+          cp data/holdings.json ccass-tracker-web/public/data/holdings.json
+
+      - name: Build React frontend
+        working-directory: ccass-tracker-web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: |
+          npx vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN" --yes \
+            || { echo "::error::Vercel 部署失败"; exit 1; }
+          echo "Vercel 部署完成"

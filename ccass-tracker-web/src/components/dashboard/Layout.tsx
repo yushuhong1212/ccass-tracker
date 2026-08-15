@@ -31,12 +31,12 @@ export function AppHeader({ onRefresh }: AppHeaderProps) {
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-background/80 px-4 py-2.5 backdrop-blur-md">
       <div className="flex items-center gap-2.5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-info to-bullish text-white shadow-sm">
+        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
           <Activity className="h-4 w-4" strokeWidth={2.5} />
         </div>
         <div className="leading-tight">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold tracking-tight text-foreground">
+            <span className="font-display text-sm font-bold tracking-wide text-foreground">
               CCASS Tracker
             </span>
             <span className="hidden rounded bg-secondary px-1.5 py-px text-[10px] font-medium text-muted-foreground sm:inline">

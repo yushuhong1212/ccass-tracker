@@ -1,89 +1,89 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Light Financial Theme — CCASS Tracker */
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 222 47% 11%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 20% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 20% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 210 20% 96%;
-    --accent-foreground: 222 47% 11%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 142 71% 40%;
-    --radius: 0.5rem;
+    /* 「账房」纸感浅色主题 — 暖纸 × 墨色 × 青铜 */
+    --background: 37 45% 94%;          /* 暖纸 #F7F2EA */
+    --foreground: 30 13% 9%;           /* 墨色 #1B1815 */
+    --card: 40 43% 99%;                /* 纸白 #FFFDF8 */
+    --card-foreground: 30 13% 9%;
+    --popover: 40 43% 99%;
+    --popover-foreground: 30 13% 9%;
+    --primary: 33 53% 40%;             /* 青铜 #9C6B30 */
+    --primary-foreground: 37 45% 96%;
+    --secondary: 39 42% 91%;           /* 浅纸 #F1EADD */
+    --secondary-foreground: 33 49% 30%;
+    --muted: 39 42% 91%;
+    --muted-foreground: 43 9% 40%;     /* 灰褐 #6E695C */
+    --accent: 38 48% 88%;              /* 青铜浅底 #EFE2D0 */
+    --accent-foreground: 33 49% 30%;   /* 深青铜 #7A5220 */
+    --destructive: 8 51% 37%;          /* 砖红 #8F3B2E */
+    --destructive-foreground: 37 45% 96%;
+    --border: 42 31% 84%;              /* 发丝线 #E2DAC8 */
+    --input: 42 31% 84%;
+    --ring: 33 53% 40%;
+    --radius: 0.25rem;                 /* 刊物式小圆角 */
 
     /* Sidebar */
-    --sidebar-background: 210 20% 98%;
-    --sidebar-foreground: 215 16% 47%;
-    --sidebar-primary: 142 71% 35%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 20% 96%;
-    --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 142 71% 40%;
+    --sidebar-background: 39 45% 95%;
+    --sidebar-foreground: 43 9% 40%;
+    --sidebar-primary: 33 53% 40%;
+    --sidebar-primary-foreground: 37 45% 96%;
+    --sidebar-accent: 38 48% 88%;
+    --sidebar-accent-foreground: 33 49% 30%;
+    --sidebar-border: 42 31% 84%;
+    --sidebar-ring: 33 53% 40%;
 
-    /* Financial Semantic Colors — adjusted for light background */
-    --bullish: 142 71% 35%;
-    --bearish: 0 72% 51%;
-    --warning: 35 80% 41%;
-    --info: 217 91% 54%;
-    --track-accent: 32 95% 44%;
+    /* 金融语义色 — 苔绿涨 / 砖红跌 */
+    --bullish: 152 39% 30%;            /* 苔绿 #2F6B4F */
+    --bearish: 8 51% 37%;              /* 砖红 #8F3B2E */
+    --warning: 33 56% 40%;
+    --info: 200 28% 36%;
+    --track-accent: 33 53% 40%;        /* ★追踪 = 青铜 */
 
-    /* Typography */
-    --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+    /* Typography — 思源黑体系（本地字体栈，不加载网络字体） */
+    --font-sans: 'Noto Sans SC', 'Source Han Sans SC', 'PingFang SC', 'Microsoft YaHei', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', Georgia, serif;
   }
 
   .dark {
-    --background: 222 47% 5%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 8%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222 47% 11%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 12%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 142 71% 45%;
+    /* 「账房」墨色深色主题 — 深墨纸 × 暖白 × 亮青铜 */
+    --background: 30 10% 8%;           /* 深墨纸 #161412 */
+    --foreground: 40 32% 89%;          /* 暖白 #ECE6DA */
+    --card: 30 12% 11%;
+    --card-foreground: 40 32% 89%;
+    --popover: 30 12% 10%;
+    --popover-foreground: 40 32% 89%;
+    --primary: 31 45% 60%;             /* 亮青铜 #C89B6C */
+    --primary-foreground: 30 10% 8%;
+    --secondary: 25 8% 14%;
+    --secondary-foreground: 40 32% 89%;
+    --muted: 25 8% 14%;
+    --muted-foreground: 43 8% 51%;
+    --accent: 30 12% 18%;
+    --accent-foreground: 31 45% 70%;
+    --destructive: 11 55% 66%;         /* 亮砖红 #D98B7A */
+    --destructive-foreground: 30 10% 8%;
+    --border: 30 12% 20%;              /* #3A332C */
+    --input: 30 12% 20%;
+    --ring: 31 45% 60%;
 
-    --sidebar-background: 222 47% 10%;
-    --sidebar-foreground: 210 20% 80%;
-    --sidebar-primary: 142 71% 45%;
-    --sidebar-primary-foreground: 222 47% 5%;
-    --sidebar-accent: 217 33% 15%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 15%;
-    --sidebar-ring: 142 71% 45%;
+    --sidebar-background: 30 12% 10%;
+    --sidebar-foreground: 40 20% 75%;
+    --sidebar-primary: 31 45% 60%;
+    --sidebar-primary-foreground: 30 10% 8%;
+    --sidebar-accent: 30 12% 16%;
+    --sidebar-accent-foreground: 40 32% 89%;
+    --sidebar-border: 30 12% 18%;
+    --sidebar-ring: 31 45% 60%;
 
-    --bullish: 142 71% 45%;
-    --bearish: 0 72% 51%;
-    --warning: 38 92% 50%;
-    --info: 217 91% 60%;
-    --track-accent: 47 95% 55%;
+    --bullish: 139 33% 62%;            /* 亮苔绿 #7FBF93 */
+    --bearish: 11 55% 66%;
+    --warning: 35 70% 62%;
+    --info: 200 40% 65%;
+    --track-accent: 31 45% 60%;
   }
 }
 

@@ -56,7 +56,8 @@ module.exports = {
         "track-accent": "hsl(var(--track-accent))",
       },
       fontFamily: {
-        sans: ["IBM Plex Sans", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ["Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", "Georgia", "serif"],
       },
       borderRadius: {
         xl: "calc(var(--radius) + 4px)",

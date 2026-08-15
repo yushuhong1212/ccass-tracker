@@ -8,26 +8,26 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tool
 import { BarChart3, Search, Star, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// -------- Chart Color Palette (与原始版语义对齐) --------
+// -------- Chart Color Palette（账房杂志风：低饱和刊物色系） --------
 // 跟踪机构用固定色，其余经纪商用调色板哈希取色。
 const INST_COLORS: Record<string, string> = {
-  cscchk: '#ef4444',            // 中登(港) - 红
-  hgt: '#f97316',               // 港股通(沪) - 橙
-  sgt: '#fb923c',               // 港股通(深) - 浅橙
-  cicc: '#8b5cf6',              // 中金 - 紫
-  citigroup: '#06b6d4',         // 花旗 - 青
-  hsbc: '#f04343',              // 汇丰 - 深红
-  standardchartered: '#10b981', // 港股通(深) 绿
-  ubs: '#f59e0b',               // 瑞银 - 琥珀
-  morganstanley: '#00d4aa',     // 大摩 - 青绿
-  merrill: '#e879f9',           // 美林 - 品红
-  jpmorgan: '#3b82f6',          // 小摩 - 蓝
-  goldman: '#a855f7',           // 高盛 - 亮紫
+  cscchk: '#8F3B2E',            // 中登(港) - 砖红
+  hgt: '#C07A3E',               // 港股通(沪) - 陶土橙
+  sgt: '#D2A76B',               // 港股通(深) - 浅铜
+  cicc: '#96688F',              // 中金 - 灰紫
+  citigroup: '#4E7A9E',         // 花旗 - 灰蓝
+  hsbc: '#B4543E',              // 汇丰 - 赭红
+  standardchartered: '#4E8262', // 渣打 - 苔绿
+  ubs: '#757AA6',               // 瑞银 - 蓝紫
+  morganstanley: '#4E857E',     // 大摩 - 青绿
+  merrill: '#A66A74',           // 美林 - 豆沙红
+  jpmorgan: '#3F6E9E',          // 小摩 - 石蓝
+  goldman: '#94813F',           // 高盛 - 橄榄金
 };
 const PALETTE = [
-  '#f04343', '#3b82f6', '#06b6d4', '#f59e0b', '#8b5cf6',
-  '#00d4aa', '#e879f9', '#fb923c', '#22c55e', '#ec4899',
-  '#0ea5e9', '#a855f7', '#eab308', '#14b8a6', '#f97316', '#6366f1',
+  '#B4543E', '#C07A3E', '#94813F', '#75814B', '#4E8262', '#4E857E',
+  '#5A7E93', '#3F6E9E', '#757AA6', '#96688F', '#A66A74', '#8F3B2E',
+  '#C89B6C', '#7F8B7A', '#8D7F9C', '#5E6B54',
 ];
 
 const MAX_LINES = 12; // 折线最多条数，避免图表过乱

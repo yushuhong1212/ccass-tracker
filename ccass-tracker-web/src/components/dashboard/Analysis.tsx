@@ -36,7 +36,7 @@ function ForceGauge({ score }: { score: number }) {
           <circle cx="100" cy="90" r="5" fill="hsl(var(--foreground))" />
         </svg>
       </div>
-      <div className="text-2xl font-bold font-mono mt-1" style={{ color }}>
+      <div className="font-display text-2xl font-bold tabular-nums mt-1" style={{ color }}>
         {score > 0 ? '+' : ''}{score}
       </div>
       <div className="text-[10px] text-muted-foreground -mt-0.5">机构合力分</div>

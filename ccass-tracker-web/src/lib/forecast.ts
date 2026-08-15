@@ -331,3 +331,96 @@ export function nextTradingDays(lastDate: Date, n: number): Date[] {
   }
   return days;
 }
+
+// ---------- 盘中实时预测（当日分时 → 全天成交量估计） ----------
+
+/** 港股典型日内成交进度剖面：按已过交易分钟数（09:30–12:00 共 150 分钟，13:00–16:00 共 180 分钟，合计 330） */
+const PROFILE: [number, number][] = [
+  [0, 0], [15, 0.2], [30, 0.33], [60, 0.45], [90, 0.55],
+  [120, 0.62], [150, 0.67], [210, 0.85], [240, 0.91], [270, 0.965], [300, 0.99], [330, 1],
+];
+
+export function profileFrac(min: number): number {
+  if (min <= 0) return 0.01;
+  if (min >= 330) return 1;
+  for (let i = 1; i < PROFILE.length; i++) {
+    if (min <= PROFILE[i][0]) {
+      const [x0, y0] = PROFILE[i - 1];
+      const [x1, y1] = PROFILE[i];
+      return y0 + ((y1 - y0) * (min - x0)) / (x1 - x0);
+    }
+  }
+  return 1;
+}
+
+/** HHMM → 已过交易分钟（午休 12:00–13:00 不计） */
+export function toTradingMin(hhmm: string): number {
+  const h = +hhmm.slice(0, 2);
+  const m = +hhmm.slice(2);
+  const t = h * 60 + m;
+  if (t < 570) return 0; // 09:30 前
+  if (t <= 720) return t - 570; // 上午 09:30–12:00 → 0–150
+  if (t < 780) return 150; // 午休
+  return Math.min(330, t - 780 + 150); // 下午 13:00–16:00 → 150–330
+}
+
+export interface IntradayPoint {
+  t: string;
+  min: number;
+  price: number;
+  vol: number; // 累计成交股数
+  amt: number; // 累计成交额（港元）
+}
+
+export interface IntradayData {
+  date: string;
+  pts: IntradayPoint[];
+}
+
+/** 拉取当日分时（每分钟一条：HHMM 价格 累计量 累计额） */
+export async function fetchMinute(symbol: string): Promise<IntradayData> {
+  const resp = await fetch(`https://web.ifzq.gtimg.cn/appstock/app/minute/query?code=${symbol}&_=${Date.now()}`);
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  const json = await resp.json();
+  const node = json.data && json.data[symbol];
+  const rows: string[] = node && node.data && node.data.data;
+  if (!rows || rows.length < 5) throw new Error('无分时数据（可能非交易日或代码无效）');
+  const pts = rows.map((r) => {
+    const p = r.trim().split(/\s+/);
+    return { t: p[0], min: toTradingMin(p[0]), price: +p[1], vol: +p[2], amt: +p[3] };
+  });
+  return { date: node.data.date, pts };
+}
+
+export interface IntradayEstimate {
+  cum: number; // 当前累计
+  closed: boolean;
+  elapsedMin: number;
+  pctOfDay: number; // 开盘进度 0–1
+  mid: number; // 全天预测（或收盘实际）
+  lo: number;
+  hi: number;
+}
+
+/** 单指标盘中估计：剖面外推（cum/f）与近30分钟速率外推取均值，给出区间 */
+export function estimateIntraday(
+  values: number[], // 每分钟累计值序列（与 pts 对齐）
+  pts: IntradayPoint[],
+): IntradayEstimate {
+  const lastIdx = values.length - 1;
+  const cum = values[lastIdx];
+  const elapsed = pts[lastIdx].min;
+  const closed = elapsed >= 330;
+  if (closed) {
+    return { cum, closed, elapsedMin: elapsed, pctOfDay: 1, mid: cum, lo: cum, hi: cum };
+  }
+  const f = profileFrac(elapsed);
+  const estProfile = cum / f;
+  const refIdx = Math.max(0, lastIdx - 30);
+  const pace =
+    (values[lastIdx] - values[refIdx]) / Math.max(1, pts[lastIdx].min - pts[refIdx].min);
+  const estPace = cum + pace * (330 - elapsed);
+  const lo = Math.min(estProfile, estPace);
+  const hi = Math.max(estProfile, estPace);
+  return { cum, closed, elapsedMin: elapsed, pctOfDay: elapsed / 330, mid: (estProfile + estPace) / 2, lo, hi };
+}

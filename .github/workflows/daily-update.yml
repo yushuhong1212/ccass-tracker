@@ -2,7 +2,7 @@ name: Daily CCASS Update
 
 on:
   schedule:
-    - cron: "0 1 * * 1-5"    # 工作日 UTC 01:00 = 北京时间 09:00
+    - cron: "0 1 * * *"       # 每天 UTC 01:00 = 北京时间 09:00（周末无新数据时自动跳过，不产生空提交）
   workflow_dispatch:          # 支持手动触发
 
 permissions:

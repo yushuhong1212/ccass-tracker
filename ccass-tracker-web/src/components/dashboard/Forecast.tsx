@@ -11,7 +11,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, RefreshCw, LineChart as LineChartIcon } from 'lucide-react';
+import { Search, RefreshCw, LineChart as LineChartIcon, Activity } from 'lucide-react';
 import {
   fetchKline,
   buildAmount,
@@ -23,9 +23,231 @@ import {
   MODEL_DESC,
   backtest,
   nextTradingDays,
+  fetchMinute,
+  estimateIntraday,
   type Point,
   type SearchItem,
+  type IntradayData,
 } from '@/lib/forecast';
+
+interface IntradayCardProps {
+  intraday: { loading: boolean; error: string | null; data: IntradayData | null; updatedAt: number | null };
+  autoRefresh: boolean;
+  onToggleAuto: (v: boolean) => void;
+  onRefresh: () => void;
+  dailyAmount: Point[] | null;
+  dailyVolume: Point[] | null;
+}
+
+/** 当日盘中实时预测：分时累计 → 剖面/速率双估计 → 全天成交量区间 */
+function IntradayCard({ intraday, autoRefresh, onToggleAuto, onRefresh, dailyAmount, dailyVolume }: IntradayCardProps) {
+  const { data, loading, error, updatedAt } = intraday;
+
+  const amtSeries = data ? data.pts.map((p) => p.amt / 1e8) : null;
+  const volSeries = data ? data.pts.map((p) => p.vol / 1e4) : null;
+  const estAmt = amtSeries && data ? estimateIntraday(amtSeries, data.pts) : null;
+  const estVol = volSeries && data ? estimateIntraday(volSeries, data.pts) : null;
+  const prevAmt = dailyAmount && dailyAmount.length > 1 ? dailyAmount[dailyAmount.length - 1].value : null;
+  const prevVol = dailyVolume && dailyVolume.length > 1 ? dailyVolume[dailyVolume.length - 1].value : null;
+  const lastT = data ? data.pts[data.pts.length - 1].t : '';
+
+  const rows =
+    data && amtSeries && volSeries
+      ? data.pts.map((p, i) => ({ label: p.t, amount: +amtSeries[i].toFixed(2), volume: +volSeries[i].toFixed(1) }))
+      : [];
+
+  const cssVar = (name: string) => `hsl(var(--${name}))`;
+
+  const metricCards = (
+    est: { cum: number; closed: boolean; pctOfDay: number; mid: number; lo: number; hi: number } | null,
+    prev: number | null,
+    name: string,
+    unit: string,
+  ) => {
+    if (!est) return null;
+    const vsYesterday = est.mid != null && prev != null && prev > 0 ? ((est.mid - prev) / prev) * 100 : null;
+    return (
+      <>
+        <div className="rounded-md border border-border bg-card p-3">
+          <div className="text-[11px] text-muted-foreground">
+            {name}当前累计（{lastT}）
+          </div>
+          <div className="font-display text-lg font-bold tabular-nums text-foreground mt-0.5">
+            {fmtNum(est.cum)}
+            <span className="ml-1 text-[10px] font-normal text-muted-foreground">{unit}</span>
+          </div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">
+            {est.closed ? '已收盘' : `已开盘 ${(est.pctOfDay * 100).toFixed(0)}%`}
+          </div>
+        </div>
+        <div className="rounded-md border border-border bg-card p-3">
+          <div className="text-[11px] text-muted-foreground">{est.closed ? `${name}全天实际` : `${name}全天预测`}</div>
+          <div className="font-display text-lg font-bold tabular-nums text-primary mt-0.5">
+            {fmtNum(est.mid)}
+            <span className="ml-1 text-[10px] font-normal text-muted-foreground">{unit}</span>
+          </div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">
+            {est.closed ? data?.date : `区间 ${fmtNum(est.lo)} ~ ${fmtNum(est.hi)}`}
+          </div>
+        </div>
+        <div className="rounded-md border border-border bg-card p-3">
+          <div className="text-[11px] text-muted-foreground">{est.closed ? `${name} vs 上一交易日` : `预测 vs 上一交易日`}</div>
+          <div
+            className={`font-display text-lg font-bold tabular-nums mt-0.5 ${
+              vsYesterday == null ? 'text-foreground' : vsYesterday >= 0 ? 'text-bullish' : 'text-bearish'
+            }`}
+          >
+            {vsYesterday == null ? (
+              '—'
+            ) : (
+              <>
+                {vsYesterday >= 0 ? '▲' : '▼'} {Math.abs(vsYesterday).toFixed(1)}%
+              </>
+            )}
+          </div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">
+            {prev != null ? `昨日 ${fmtNum(prev)} ${unit}` : '无昨日数据'}
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-3 sm:p-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+            <Activity className="h-3.5 w-3.5 text-primary" />
+            当日盘中预测（实时）
+          </span>
+          {data && (
+            <span className="text-[11px] text-muted-foreground">
+              {data.date} · {rows.length} 分钟
+            </span>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            {data && (
+              <label className="flex items-center gap-1 text-[11px] text-muted-foreground select-none">
+                <input
+                  type="checkbox"
+                  checked={autoRefresh}
+                  onChange={(e) => onToggleAuto(e.target.checked)}
+                  className="accent-primary"
+                />
+                自动刷新(60s)
+              </label>
+            )}
+            <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={onRefresh} disabled={loading}>
+              {loading ? <RefreshCw className="mr-1 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
+              刷新
+            </Button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            {error}（非交易日或代码无效时分时不可用）
+          </div>
+        )}
+
+        {!data && !loading && !error && (
+          <div className="flex h-20 flex-col items-center justify-center gap-1.5 text-muted-foreground">
+            <span className="text-xs">盘中用日内成交进度剖面 + 近 30 分钟速率双估计，外推今日全天成交量</span>
+            <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={onRefresh}>
+              加载分时数据
+            </Button>
+          </div>
+        )}
+
+        {loading && !data && (
+          <div className="flex h-20 items-center justify-center gap-2 text-muted-foreground">
+            <RefreshCw className="h-4 w-4 animate-spin" />
+            <span className="text-xs">正在拉取分时数据…</span>
+          </div>
+        )}
+
+        {data && (
+          <>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
+              {metricCards(estAmt, prevAmt, '成交额', '亿港元')}
+              {metricCards(estVol, prevVol, '成交股数', '万股')}
+            </div>
+            <div className="h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={rows} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={cssVar('border')} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 10, fill: cssVar('muted-foreground') }}
+                    axisLine={{ stroke: cssVar('border') }}
+                    tickLine={false}
+                    interval="preserveStartEnd"
+                    minTickGap={36}
+                  />
+                  <YAxis
+                    yAxisId="amt"
+                    tick={{ fontSize: 10, fill: cssVar('primary') }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={46}
+                  />
+                  <YAxis
+                    yAxisId="vol"
+                    orientation="right"
+                    tick={{ fontSize: 10, fill: cssVar('info') }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={46}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: cssVar('popover'),
+                      border: `1px solid ${cssVar('border')}`,
+                      borderRadius: 4,
+                      fontSize: 11,
+                      color: cssVar('popover-foreground'),
+                    }}
+                    labelStyle={{ color: cssVar('muted-foreground'), fontSize: 10 }}
+                    formatter={(value, name) => {
+                      const v = value == null ? null : Number(value);
+                      return v == null || !isFinite(v)
+                        ? ['—', String(name)]
+                        : [v.toLocaleString('zh-CN'), String(name)];
+                    }}
+                  />
+                  <Line
+                    yAxisId="amt"
+                    type="monotone"
+                    dataKey="amount"
+                    name="累计成交额(亿港元)"
+                    stroke={cssVar('primary')}
+                    strokeWidth={1.6}
+                    dot={false}
+                  />
+                  <Line
+                    yAxisId="vol"
+                    type="monotone"
+                    dataKey="volume"
+                    name="累计成交股数(万股)"
+                    stroke={cssVar('info')}
+                    strokeWidth={1.6}
+                    dot={false}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              全天预测 = 日内成交进度剖面外推与近 30 分钟速率外推的均值（区间取两者上下界）。剖面按港股典型 U
+              型节奏（开盘与收盘活跃、午间清淡）标定。
+              {updatedAt ? ` 更新于 ${new Date(updatedAt).toLocaleTimeString('zh-CN')}` : ''}
+            </p>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export interface TrackedStock {
   code: string;
@@ -85,6 +307,39 @@ export function StockForecast({ trackedStocks, defaultCode }: ForecastProps) {
   const [search, setSearch] = useState<SearchState>({ items: [], open: false });
   const searchBoxRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── 盘中实时预测 ──
+  const [intraday, setIntraday] = useState<{
+    loading: boolean;
+    error: string | null;
+    data: IntradayData | null;
+    updatedAt: number | null;
+  }>({ loading: false, error: null, data: null, updatedAt: null });
+  const [autoRefresh, setAutoRefresh] = useState(true);
+
+  const symbol = stock ? 'hk' + stock.code.padStart(5, '0') : null;
+
+  const loadIntraday = useCallback(async (sym: string) => {
+    setIntraday((s) => ({ ...s, loading: true, error: null }));
+    try {
+      const data = await fetchMinute(sym);
+      setIntraday({ loading: false, error: null, data, updatedAt: Date.now() });
+    } catch (e) {
+      setIntraday({ loading: false, error: e instanceof Error ? e.message : String(e), data: null, updatedAt: Date.now() });
+    }
+  }, []);
+
+  // 自动刷新：开启且已加载过 → 每 60s 拉一次分时
+  useEffect(() => {
+    if (!autoRefresh || !symbol || !intraday.data) return;
+    const id = setInterval(() => loadIntraday(symbol), 60_000);
+    return () => clearInterval(id);
+  }, [autoRefresh, symbol, intraday.data, loadIntraday]);
+
+  // 切换股票时清掉旧分时
+  useEffect(() => {
+    setIntraday({ loading: false, error: null, data: null, updatedAt: null });
+  }, [stock?.code]);
 
   const loadStock = useCallback(async (code: string, name?: string) => {
     setLoading(true);
@@ -258,6 +513,16 @@ export function StockForecast({ trackedStocks, defaultCode }: ForecastProps) {
                 {raw ? `${raw.length} 个交易日` : ''}
               </div>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 w-full text-[11px]"
+              disabled={!stock || intraday.loading}
+              onClick={() => stock && loadIntraday('hk' + stock.code.padStart(5, '0'))}
+            >
+              {intraday.loading ? <RefreshCw className="mr-1 h-3 w-3 animate-spin" /> : <Activity className="mr-1 h-3 w-3" />}
+              预测今日成交量（盘中实时）
+            </Button>
           </div>
 
           {/* 模型 */}
@@ -416,6 +681,16 @@ export function StockForecast({ trackedStocks, defaultCode }: ForecastProps) {
             </div>
           </div>
         </div>
+
+        {/* 盘中实时预测卡 */}
+        <IntradayCard
+          intraday={intraday}
+          autoRefresh={autoRefresh}
+          onToggleAuto={setAutoRefresh}
+          onRefresh={() => stock && loadIntraday('hk' + stock.code.padStart(5, '0'))}
+          dailyAmount={raw}
+          dailyVolume={rawVol}
+        />
 
         {/* 视图切换 + 时间范围 */}
         <div className="flex flex-wrap items-center gap-2">

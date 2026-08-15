@@ -194,7 +194,7 @@ def api_fetch():
 > `ccass-tracker-web/vercel.json` 构建（复制 `data/holdings.json` → vite build）→ 发布生产。
 > 不需要任何部署密钥（GitHub Secrets 已清空），前端构建失败会收到 Vercel 邮件通知。
 
-GitHub Actions 工作流 `.github/workflows/daily-update.yml` 在**每个交易日（北京时间 09:00）**自动执行：
+GitHub Actions 工作流 `.github/workflows/daily-update.yml` 在**每天（北京时间 09:00）**自动执行（周六上午可抓到周五晚发布的持仓，周末无新数据时自动跳过、不产生空提交）：
 
 1. `update.py` 增量抓取 29 只监控股票的最新 CCASS 数据（历史月份走缓存，只有最新月发请求）；
 2. 数据有实质变化则 commit + push（无变化不提交，也不触发部署——`generatedAt` 只在数据真变时更新）；

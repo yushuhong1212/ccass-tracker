@@ -20,3 +20,8 @@ Thumbs.db
 # 注意：data/ 目录需要提交（holdings.json 与 raw_cache/ 是数据，需进仓库）
 # 但港交所证券名单是运行时自动下载的缓存，不进 git：
 data/sec_list/
+
+# 前端数据副本：由 CI 在构建前从 data/holdings.json 复制，本地开发用上面命令手动同步，
+# 不进 git（避免仓库里长期躺着过期副本、每天重复提交 7MB+ 数据）
+ccass-tracker-web/public/data/holdings.json
+ccass-tracker-mobile/public/data/holdings.json

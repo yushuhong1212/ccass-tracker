@@ -113,7 +113,8 @@ def load_cache(code: str) -> dict:
 def save_cache(code: str, cache: dict):
     RAW_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     p = RAW_CACHE_DIR / ("%s.json" % code)
-    p.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
+    # 紧凑输出：缓存文件体积减半以上，git 仓库与 CI checkout 都更轻
+    p.write_text(json.dumps(cache, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
 
 # ----------------------------------------------------------------------------
@@ -329,7 +330,7 @@ def main():
     dataset["months"] = all_months
     dataset["generatedAt"] = datetime.now().astimezone().isoformat()
 
-    out_path.write_text(json.dumps(dataset, ensure_ascii=False, indent=2), encoding="utf-8")
+    out_path.write_text(json.dumps(dataset, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     log.info("✅ 已写出 %s（%d 只股票，月份 %s ~ %s）。",
              out_path, len(dataset["stocks"]),
              all_months[0] if all_months else "-", all_months[-1] if all_months else "-")

@@ -1012,7 +1012,8 @@ def main():
     dataset["generatedAt"] = datetime.now().astimezone().isoformat()
 
     with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(dataset, f, ensure_ascii=False, indent=2)
+        # 紧凑输出：holdings.json 供前端 fetch，无缩进可省约 55% 体积（3.9MB → 1.7MB）
+        json.dump(dataset, f, ensure_ascii=False, separators=(",", ":"))
     log.info("✅ 已写出：%s（共 %d 只股票）", out_path, len(dataset.get("stocks", {})))
 
 

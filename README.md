@@ -6,16 +6,26 @@
 
 ```
 经纪持股变化/
-├── index.html              # 仪表盘（前端，纯静态）
-├── analyze.js              # 量化分析引擎（机构合力分 → 投资建议）
+├── index.html              # 旧版仪表盘（纯静态，仅留档；日常使用 ccass-tracker-web）
+├── analyze.js              # 量化分析引擎（机构合力分 → 投资建议，旧版前端用）
 ├── fetch_ccass.py          # CCASS 全量抓取脚本（首次建库用）
 ├── update.py               # 增量更新脚本（日常追加用，月级缓存 + 同月取最新）
 ├── requirements.txt        # Python 依赖：requests / beautifulsoup4 / lxml
+├── vercel.json             # Vercel 部署配置（静态目录指向 ccass-tracker-web/dist）
 ├── data/
-│   ├── holdings.json       # 仪表盘读取的最终数据
+│   ├── holdings.json       # 唯一数据源（紧凑 JSON；前端副本由 CI 构建前复制）
 │   └── raw_cache/          # update.py 的按月原始缓存（<code>.json）
-└── README.md               # 本文件
+├── ccass-tracker-web/      # 主前端：React 19 + Vite（CI 每日构建并部署到 Vercel）
+│   └── public/data/        #   holdings.json 不进 git，本地开发手动复制（见下）
+├── ccass-tracker-mobile/   # 移动端 H5（手机优先布局；尚未接入 CI 部署）
+└── .github/workflows/      # 每日抓数 → 提交 → 构建 → 部署 Vercel
 ```
+
+> 本地开发前端时，先同步数据（该副本已从 git 移除，避免仓库里躺过期数据）：
+> ```bash
+> cp data/holdings.json ccass-tracker-web/public/data/holdings.json
+> cp data/holdings.json ccass-tracker-mobile/public/data/holdings.json   # 移动端同理
+> ```
 
 ---
 
@@ -177,26 +187,31 @@ def api_fetch():
 
 ---
 
-## CI 自动部署到腾讯云 CloudBase（国内访问）
+## CI：每日抓数 + 自动部署到 Vercel
 
-Vercel / Cloudflare Pages 的默认域名（`*.vercel.app` / `*.pages.dev`）在国内被墙。本仓库的 GitHub Actions 在每天抓完数据后，会把静态文件同步部署到**腾讯云 CloudBase 静态托管**，其默认域名 `*.tcloudbaseapp.com` 走国内节点，国内可正常访问。
+> 历史：曾用腾讯云 CloudBase（国内访问友好），已切换为 **Vercel**（runner → Vercel 全球 CDN，日本/新加坡节点，网络稳定，`*.vercel.app` 需科学环境访问；绑定自定义域名可直连）。
 
-CI 用「密钥」方式认证（服务器环境无法弹浏览器登录），需在 GitHub 仓库配置 3 个 Secrets：
+GitHub Actions 工作流 `.github/workflows/daily-update.yml` 在**每个交易日（北京时间 09:00）**自动执行：
+
+1. `update.py` 增量抓取 29 只监控股票的最新 CCASS 数据（历史月份走缓存，只有最新月发请求）；
+2. 数据有变化则 commit + push（无变化则跳过后续所有步骤，不空跑部署）；
+3. 把 `data/holdings.json` 复制进 `ccass-tracker-web/public/data/`，`npm run build` 构建静态站点；
+4. 用 `vercel deploy --prebuilt --prod` 部署到 Vercel。
+
+CI 用「Token」方式认证，需在 GitHub 仓库配置 3 个 Secrets：
 
 | Secret 名 | 值 | 哪里拿 |
 |-----------|-----|--------|
-| `TCB_SECRET_ID` | 腾讯云 API 密钥 ID（`AKID...` 开头） | 访问管理 → [API 密钥管理](https://console.cloud.tencent.com/cam/capi) → 新建密钥 |
-| `TCB_SECRET_KEY` | API 密钥（与 SecretId 配对的那串） | 同上，与 SecretId 一同生成 |
-| `TCB_ENV_ID` | CloudBase 环境 ID（如 `ccass-tracker-xxxxx`） | CloudBase 控制台环境概览页 |
+| `VERCEL_TOKEN` | Vercel 访问令牌 | Vercel 后台 → Settings → Tokens → Create |
+| `VERCEL_ORG_ID` | 团队/个人 ID | `vercel link` 后看 `.vercel/project.json`（本地，勿提交） |
+| `VERCEL_PROJECT_ID` | 项目 ID | 同上 |
 
-**配置位置**：GitHub 仓库 → **Settings → Secrets and variables → Actions → New repository secret**，分别添加上面 3 个。
+**配置位置**：GitHub 仓库 → **Settings → Secrets and variables → Actions → New repository secret**。
 
-> ⚠️ 安全提示：API 密钥等价于你的腾讯云账号凭据，**切勿提交进代码**，只放在 Secrets 里。若担心权限过大，可在腾讯云访问管理里新建一个子账号，只授予 `CloudBase 全读写` 权限，用子账号的密钥。
-
-配置完成后，下次手动触发或定时触发 `Daily CCASS Update` 工作流，就会在抓数据、commit 之后，自动把 `index.html` + `analyze.js` + `data/holdings.json` 传到 CloudBase，网站数据随之更新。
+> ⚠️ `.vercel/` 目录已在 `.gitignore` 中——本地的项目链接文件提交进仓库会导致 CI 报 "Project Settings could not be retrieved"，Secrets 传入的 ID 优先级足够。
 
 ### 当前监控股票清单（29 只）
 
-`00020 00100 00148 00300 00700 01288 01347 01548 01810 01815 01888 02359 02388 02513 02723 02865 03308 03986 06181 06809 06869 06915 06990 09606 09660 09880 09903 09988`
+`00020 00100 00148 00300 00700 01288 01347 01548 01810 01815 01888 02359 02388 02513 02723 02865 03308 03317 03986 06181 06809 06869 06915 06990 09606 09660 09880 09903 09988`
 
 改 `.github/workflows/daily-update.yml` 里 `update.py -c ...` 那行的股票代码即可增删。

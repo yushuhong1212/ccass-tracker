@@ -187,28 +187,30 @@ def api_fetch():
 
 ---
 
-## CI：每日抓数 + 自动部署到 Vercel
+## CI：每日抓数，push 即自动部署
 
-> 历史：曾用腾讯云 CloudBase（国内访问友好），已切换为 **Vercel**（runner → Vercel 全球 CDN，日本/新加坡节点，网络稳定，`*.vercel.app` 需科学环境访问；绑定自定义域名可直连）。
+> 架构（2026-08-15 起）：**CI 只负责数据，部署全部交给 Vercel Git 集成**。
+> 任何 push 到 `main`（含 CI 的每日数据提交）→ Vercel 自动拉取仓库、按
+> `ccass-tracker-web/vercel.json` 构建（复制 `data/holdings.json` → vite build）→ 发布生产。
+> 不需要任何部署密钥（GitHub Secrets 已清空），前端构建失败会收到 Vercel 邮件通知。
 
 GitHub Actions 工作流 `.github/workflows/daily-update.yml` 在**每个交易日（北京时间 09:00）**自动执行：
 
 1. `update.py` 增量抓取 29 只监控股票的最新 CCASS 数据（历史月份走缓存，只有最新月发请求）；
-2. 数据有变化则 commit + push（无变化则跳过后续所有步骤，不空跑部署）；
-3. 把 `data/holdings.json` 复制进 `ccass-tracker-web/public/data/`，`npm run build` 构建静态站点；
-4. 用 `vercel deploy --prebuilt --prod` 部署到 Vercel。
+2. 数据有实质变化则 commit + push（无变化不提交，也不触发部署——`generatedAt` 只在数据真变时更新）；
+3. push 触发 Vercel 自动构建部署，1-2 分钟后线上更新。
 
-CI 用「Token」方式认证，需在 GitHub 仓库配置 3 个 Secrets：
+**访问地址**（Vercel 后台 → 项目 → Settings → Domains 可管理）：
 
-| Secret 名 | 值 | 哪里拿 |
-|-----------|-----|--------|
-| `VERCEL_TOKEN` | Vercel 访问令牌 | Vercel 后台 → Settings → Tokens → Create |
-| `VERCEL_ORG_ID` | 团队/个人 ID | `vercel link` 后看 `.vercel/project.json`（本地，勿提交） |
-| `VERCEL_PROJECT_ID` | 项目 ID | 同上 |
+| 域名 | 说明 |
+|------|------|
+| `ccass.jeremyyu.top` | 自定义域名（国内友好，推荐使用） |
+| `ccass-tracker.vercel.app` | Vercel 默认域名（国内访问不稳定） |
 
-**配置位置**：GitHub 仓库 → **Settings → Secrets and variables → Actions → New repository secret**。
+**Vercel 项目关键设置**（改动了要在后台同步检查）：
 
-> ⚠️ `.vercel/` 目录已在 `.gitignore` 中——本地的项目链接文件提交进仓库会导致 CI 报 "Project Settings could not be retrieved"，Secrets 传入的 ID 优先级足够。
+- Root Directory = `ccass-tracker-web`，Framework = Vite
+- 构建配置在 `ccass-tracker-web/vercel.json`（构建时自动复制数据文件）
 
 ### 当前监控股票清单（29 只）
 

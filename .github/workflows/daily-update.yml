@@ -4,11 +4,6 @@ on:
   schedule:
     - cron: "0 1 * * 1-5"    # 工作日 UTC 01:00 = 北京时间 09:00
   workflow_dispatch:          # 支持手动触发
-    inputs:
-      force_deploy:
-        description: "强制构建并部署（数据无变化也执行，用于补部署/验证部署链路）"
-        type: boolean
-        default: false
 
 permissions:
   contents: write             # 允许机器人提交数据
@@ -47,65 +42,27 @@ jobs:
       - name: Run incremental update
         run: python update.py -c 00020 00100 00148 00300 00700 01288 01347 01548 01810 01815 01888 02359 02388 02513 02723 02865 03308 03986 06181 06809 06869 06915 06990 09606 09660 09880 09903 09988 03317 -m 12
 
+      # ============ 提交数据即完成部署 ============
+      # 前端部署由 Vercel 的 Git 集成负责：push 到 main 后 Vercel 自动按
+      # ccass-tracker-web/vercel.json 构建（复制数据 → vite build）并发布生产。
+      # 项目在 Vercel 后台的设置：Root Directory = ccass-tracker-web。
+      # CI 无需 Node / Vercel CLI / 任何部署密钥。
       - name: Commit updated data
-        id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/holdings.json data/raw_cache
-          # 若无变化（如非交易日/数据未发布）则不提交，也跳过后续构建与部署
+          # 若无变化（如非交易日/数据未发布）则不提交，也不会触发重新部署
           if git diff --cached --quiet; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "数据无变化，跳过提交与部署。"
+            echo "数据无变化，跳过提交。"
             exit 0
           fi
-          echo "changed=true" >> "$GITHUB_OUTPUT"
           git commit -m "chore: update ccass data $(date +%Y-%m-%d)"
           # 先同步远程最新（rebase），避免因仓库被其他方式更新过而 push 被拒；
           # holdings.json 若冲突，优先用本次 CI 抓到的最新数据（-X ours）。
           if ! git pull --rebase --no-edit -X ours origin main; then
             echo "::warning::rebase 失败，放弃本次提交以免覆盖远程。"
             git rebase --abort
-            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git push
-
-      # ============ 构建 React 版前端并部署到 Vercel ============
-      # 仅在数据有变化时执行：数据没变时产物与线上完全相同，没必要每天空跑一次部署。
-      # Vercel 替代 CloudBase：runner → Vercel 全球 CDN（日本/新加坡节点），网络稳定，
-      # 不会出现"User network is too slow"问题。自定义域名在 Vercel 后台绑定即可。
-      - name: Setup Node
-        if: steps.commit.outputs.changed == 'true' || inputs.force_deploy == true
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: 'npm'
-          cache-dependency-path: ccass-tracker-web/package.json
-
-      - name: Sync latest holdings.json into React projects
-        if: steps.commit.outputs.changed == 'true' || inputs.force_deploy == true
-        run: |
-          # public/data/holdings.json 已从 git 移除（避免仓库存过期副本），
-          # 统一在构建前从 data/holdings.json 复制；web 与 mobile 保持同一份数据。
-          mkdir -p ccass-tracker-web/public/data ccass-tracker-mobile/public/data
-          cp data/holdings.json ccass-tracker-web/public/data/holdings.json
-          cp data/holdings.json ccass-tracker-mobile/public/data/holdings.json
-
-      - name: Build React frontend
-        if: steps.commit.outputs.changed == 'true' || inputs.force_deploy == true
-        working-directory: ccass-tracker-web
-        run: |
-          npm ci
-          npm run build
-
-      - name: Deploy to Vercel
-        if: steps.commit.outputs.changed == 'true' || inputs.force_deploy == true
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-        run: |
-          npx vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN" --yes \
-            || { echo "::error::Vercel 部署失败"; exit 1; }
-          echo "Vercel 部署完成"

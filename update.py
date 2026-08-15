@@ -328,7 +328,18 @@ def main():
     # 统一 months（取所有股票共同的月份并集，按时间升序）
     all_months = sorted({m for s in dataset["stocks"].values() for m in s.get("months", [])})
     dataset["months"] = all_months
+
+    # 若数据内容与既有文件完全一致（仅时间戳差异），保留旧 generatedAt：
+    # holdings.json 字节级不变 → CI 判定「无变化」不提交，也不触发重新部署。
     dataset["generatedAt"] = datetime.now().astimezone().isoformat()
+    if out_path.exists():
+        try:
+            old = json.loads(out_path.read_text(encoding="utf-8"))
+            if old.get("months") == all_months and old.get("stocks") == dataset["stocks"]:
+                dataset["generatedAt"] = old.get("generatedAt") or dataset["generatedAt"]
+                log.info("数据内容与既有文件一致，保留原 generatedAt（无实质变化）。")
+        except (json.JSONDecodeError, OSError):
+            pass
 
     out_path.write_text(json.dumps(dataset, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     log.info("✅ 已写出 %s（%d 只股票，月份 %s ~ %s）。",

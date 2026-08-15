@@ -204,8 +204,9 @@ GitHub Actions 工作流 `.github/workflows/daily-update.yml` 在**每个交易�
 
 | 域名 | 说明 |
 |------|------|
-| `ccass.jeremyyu.top` | 自定义域名（国内友好，推荐使用） |
-| `ccass-tracker.vercel.app` | Vercel 默认域名（国内访问不稳定） |
+| `ccass.jeremyyu.top` | **唯一入口**（自定义域名，国内友好） |
+| `ccass-tracker.vercel.app` | 301 跳转到上面的自定义域名 |
+| `jeremyyu.top` | 已从项目移除（不再绑定） |
 
 **Vercel 项目关键设置**（改动了要在后台同步检查）：
 

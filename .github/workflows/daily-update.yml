@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "0 1 * * 1-5"    # 工作日 UTC 01:00 = 北京时间 09:00
   workflow_dispatch:          # 支持手动触发
+    inputs:
+      force_deploy:
+        description: "强制构建并部署（数据无变化也执行，用于补部署/验证部署链路）"
+        type: boolean
+        default: false
 
 permissions:
   contents: write             # 允许机器人提交数据
@@ -71,7 +76,7 @@ jobs:
       # Vercel 替代 CloudBase：runner → Vercel 全球 CDN（日本/新加坡节点），网络稳定，
       # 不会出现"User network is too slow"问题。自定义域名在 Vercel 后台绑定即可。
       - name: Setup Node
-        if: steps.commit.outputs.changed == 'true'
+        if: steps.commit.outputs.changed == 'true' || inputs.force_deploy == true
         uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -79,7 +84,7 @@ jobs:
           cache-dependency-path: ccass-tracker-web/package.json
 
       - name: Sync latest holdings.json into React projects
-        if: steps.commit.outputs.changed == 'true'
+        if: steps.commit.outputs.changed == 'true' || inputs.force_deploy == true
         run: |
           # public/data/holdings.json 已从 git 移除（避免仓库存过期副本），
           # 统一在构建前从 data/holdings.json 复制；web 与 mobile 保持同一份数据。
@@ -88,14 +93,14 @@ jobs:
           cp data/holdings.json ccass-tracker-mobile/public/data/holdings.json
 
       - name: Build React frontend
-        if: steps.commit.outputs.changed == 'true'
+        if: steps.commit.outputs.changed == 'true' || inputs.force_deploy == true
         working-directory: ccass-tracker-web
         run: |
           npm ci
           npm run build
 
       - name: Deploy to Vercel
-        if: steps.commit.outputs.changed == 'true'
+        if: steps.commit.outputs.changed == 'true' || inputs.force_deploy == true
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

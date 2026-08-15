@@ -11,6 +11,7 @@ import {
   ChevronsRight,
   ChevronDown,
   X,
+  TrendingUp,
 } from 'lucide-react';
 import type { StockData, ScanRow } from '@/types/ccass';
 import type { DroppedInst, BigReducer } from '@/components/dashboard/Tables';
@@ -344,7 +345,7 @@ export function AlertBanner({ droppedInstitutions, bigReducers, currentStock }: 
 // ============================================================
 // DashboardTabs —— segmented control 风格，带计数
 // ============================================================
-type TabId = 'dashboard' | 'scanner';
+type TabId = 'dashboard' | 'scanner' | 'forecast';
 
 interface DashboardTabsProps {
   activeTab: TabId;
@@ -356,6 +357,7 @@ export function DashboardTabs({ activeTab, onTabChange, stockCount }: DashboardT
   const tabs: { id: TabId; label: string; icon: React.ReactNode; badge?: number }[] = [
     { id: 'dashboard', label: '仪表盘', icon: <LayoutDashboard className="h-4 w-4" /> },
     { id: 'scanner', label: '多股扫描', icon: <Search className="h-4 w-4" />, badge: stockCount },
+    { id: 'forecast', label: '成交量预测', icon: <TrendingUp className="h-4 w-4" /> },
   ];
 
   return (

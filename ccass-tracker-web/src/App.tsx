@@ -13,12 +13,13 @@ import { Top10Table, GainerRanking, FullBrokerTable } from '@/components/dashboa
 import { HoldingsChart } from '@/components/dashboard/Charts';
 import { ForceAnalysis } from '@/components/dashboard/Analysis';
 import { StockScanner } from '@/components/dashboard/Scanner';
+import { StockForecast } from '@/components/dashboard/Forecast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
-type TabId = 'dashboard' | 'scanner';
+type TabId = 'dashboard' | 'scanner' | 'forecast';
 
 function App() {
   const { data, loading, error } = useCCASSData();
@@ -139,7 +140,12 @@ function App() {
 
       {/* Main Content */}
       <div className="p-4">
-        {activeTab === 'scanner' ? (
+        {activeTab === 'forecast' ? (
+          <StockForecast
+            trackedStocks={Object.values(data.stocks).map((s) => ({ code: s.code, name: s.name }))}
+            defaultCode={currentCode}
+          />
+        ) : activeTab === 'scanner' ? (
           <StockScanner data={data} onSelectStock={(code) => { selectCode(code); setActiveTab('dashboard'); }} />
         ) : currentStock ? (
           <div className="space-y-4">
